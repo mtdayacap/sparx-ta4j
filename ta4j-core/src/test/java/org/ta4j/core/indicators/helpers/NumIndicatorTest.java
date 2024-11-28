@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -23,42 +23,37 @@
  */
 package org.ta4j.core.indicators.helpers;
 
-import java.math.BigDecimal;
+import static junit.framework.TestCase.assertEquals;
 
+import org.junit.Before;
+import org.junit.Test;
+import org.ta4j.core.Bar;
 import org.ta4j.core.BarSeries;
+import org.ta4j.core.Indicator;
+import org.ta4j.core.indicators.AbstractIndicatorTest;
+import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
+import org.ta4j.core.num.NumFactory;
 
-/**
- * A fixed {@code Num} indicator.
- * 
- * <p>
- * Returns constant {@link Num} values for a bar.
- */
-public class FixedDecimalIndicator extends FixedIndicator<Num> {
+public class NumIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num> {
 
-    /**
-     * Constructor.
-     *
-     * @param series the bar series
-     * @param values the values to be returned by this indicator
-     */
-    public FixedDecimalIndicator(BarSeries series, double... values) {
-        super(series);
-        for (double value : values) {
-            addValue(numOf(value));
-        }
+    private NumIndicator closePrice;
+    private BarSeries barSeries;
+
+    public NumIndicatorTest(NumFactory numFactory) {
+        super(numFactory);
     }
 
-    /**
-     * Constructor.
-     *
-     * @param series the bar series
-     * @param values the values to be returned by this indicator
-     */
-    public FixedDecimalIndicator(BarSeries series, String... values) {
-        super(series);
-        for (String value : values) {
-            addValue(numOf(new BigDecimal(value)));
+    @Before
+    public void setUp() {
+        barSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withDefaultData().build();
+        closePrice = new NumIndicator(barSeries, Bar::getClosePrice);
+    }
+
+    @Test
+    public void indicatorShouldRetrieveBarClosePrice() {
+        for (int i = 0; i < 10; i++) {
+            assertEquals(closePrice.getValue(i), barSeries.getBar(i).getClosePrice());
         }
     }
 }

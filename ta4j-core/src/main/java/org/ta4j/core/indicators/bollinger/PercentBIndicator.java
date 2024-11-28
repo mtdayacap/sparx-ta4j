@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -54,8 +54,8 @@ public class PercentBIndicator extends CachedIndicator<Num> {
         this.indicator = indicator;
         BollingerBandsMiddleIndicator bbm = new BollingerBandsMiddleIndicator(new SMAIndicator(indicator, barCount));
         StandardDeviationIndicator sd = new StandardDeviationIndicator(indicator, barCount);
-        this.bbu = new BollingerBandsUpperIndicator(bbm, sd, numOf(k));
-        this.bbl = new BollingerBandsLowerIndicator(bbm, sd, numOf(k));
+        this.bbu = new BollingerBandsUpperIndicator(bbm, sd, getBarSeries().numFactory().numOf(k));
+        this.bbl = new BollingerBandsLowerIndicator(bbm, sd, getBarSeries().numFactory().numOf(k));
     }
 
     @Override

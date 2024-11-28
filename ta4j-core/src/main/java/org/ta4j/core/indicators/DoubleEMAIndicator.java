@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -48,7 +48,7 @@ public class DoubleEMAIndicator extends CachedIndicator<Num> {
      */
     public DoubleEMAIndicator(Indicator<Num> indicator, int barCount) {
         super(indicator);
-        this.two = numOf(2);
+        this.two = getBarSeries().numFactory().two();
         this.barCount = barCount;
         this.ema = new EMAIndicator(indicator, barCount);
         this.emaEma = new EMAIndicator(ema, barCount);

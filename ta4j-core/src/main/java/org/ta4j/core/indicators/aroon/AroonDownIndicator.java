@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -43,7 +43,6 @@ public class AroonDownIndicator extends CachedIndicator<Num> {
     private final int barCount;
     private final LowestValueIndicator lowestLowPriceIndicator;
     private final Indicator<Num> lowPriceIndicator;
-    private final Num hundred;
     private final Num barCountNum;
 
     /**
@@ -57,8 +56,7 @@ public class AroonDownIndicator extends CachedIndicator<Num> {
         super(lowPriceIndicator);
         this.barCount = barCount;
         this.lowPriceIndicator = lowPriceIndicator;
-        this.hundred = hundred();
-        this.barCountNum = numOf(barCount);
+        this.barCountNum = getBarSeries().numFactory().numOf(barCount);
         // + 1 needed for last possible iteration in loop
         this.lowestLowPriceIndicator = new LowestValueIndicator(lowPriceIndicator, barCount + 1);
     }
@@ -89,7 +87,9 @@ public class AroonDownIndicator extends CachedIndicator<Num> {
             nbBars++;
         }
 
-        return numOf(barCount - nbBars).dividedBy(barCountNum).multipliedBy(hundred);
+        // TODO is Num needed?
+        final var numFactory = getBarSeries().numFactory();
+        return numFactory.numOf(barCount - nbBars).dividedBy(barCountNum).multipliedBy(numFactory.hundred());
     }
 
     @Override

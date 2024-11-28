@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -25,11 +25,11 @@ package ta4jexamples;
 
 import org.ta4j.core.AnalysisCriterion;
 import org.ta4j.core.AnalysisCriterion.PositionFilter;
-import org.ta4j.core.backtest.BarSeriesManager;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseStrategy;
 import org.ta4j.core.Rule;
 import org.ta4j.core.TradingRecord;
+import org.ta4j.core.backtest.BarSeriesManager;
 import org.ta4j.core.criteria.PositionsRatioCriterion;
 import org.ta4j.core.criteria.ReturnOverMaxDrawdownCriterion;
 import org.ta4j.core.criteria.VersusEnterAndHoldCriterion;
@@ -88,8 +88,8 @@ public class Quickstart {
         // - or if the price loses more than 3%
         // - or if the price earns more than 2%
         Rule sellingRule = new CrossedDownIndicatorRule(shortSma, longSma)
-                .or(new StopLossRule(closePrice, series.numOf(3)))
-                .or(new StopGainRule(closePrice, series.numOf(2)));
+                .or(new StopLossRule(closePrice, series.numFactory().numOf(3)))
+                .or(new StopGainRule(closePrice, series.numFactory().numOf(2)));
 
         // Running our juicy trading strategy...
         BarSeriesManager seriesManager = new BarSeriesManager(series);

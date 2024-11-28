@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -43,7 +43,7 @@ public class ZLEMAIndicator extends RecursiveCachedIndicator<Num> {
 
     /**
      * Constructor.
-     * 
+     *
      * @param indicator the {@link Indicator}
      * @param barCount  the time frame
      */
@@ -51,8 +51,8 @@ public class ZLEMAIndicator extends RecursiveCachedIndicator<Num> {
         super(indicator);
         this.indicator = indicator;
         this.barCount = barCount;
-        this.two = numOf(2);
-        this.k = two.dividedBy(numOf(barCount + 1));
+        this.two = getBarSeries().numFactory().numOf(2);
+        this.k = two.dividedBy(getBarSeries().numFactory().numOf(barCount + 1));
         this.lag = (barCount - 1) / 2;
     }
 
@@ -68,7 +68,7 @@ public class ZLEMAIndicator extends RecursiveCachedIndicator<Num> {
         }
         Num zlemaPrev = getValue(index - 1);
         return k.multipliedBy(two.multipliedBy(indicator.getValue(index)).minus(indicator.getValue(index - lag)))
-                .plus(one().minus(k).multipliedBy(zlemaPrev));
+                .plus(getBarSeries().numFactory().one().minus(k).multipliedBy(zlemaPrev));
     }
 
     @Override

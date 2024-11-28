@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -38,7 +38,7 @@ public class DonchianChannelMiddleIndicator extends CachedIndicator<Num> {
 
     /**
      * Constructor.
-     * 
+     *
      * @param series   the bar series
      * @param barCount the time frame
      */
@@ -51,7 +51,8 @@ public class DonchianChannelMiddleIndicator extends CachedIndicator<Num> {
 
     @Override
     protected Num calculate(int index) {
-        return (this.lower.getValue(index).plus(this.upper.getValue(index))).dividedBy(numOf(2));
+        return (this.lower.getValue(index).plus(this.upper.getValue(index)))
+                .dividedBy(getBarSeries().numFactory().two());
     }
 
     @Override

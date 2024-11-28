@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -41,7 +41,7 @@ public class SuperTrendLowerBandIndicator extends RecursiveCachedIndicator<Num> 
 
     /**
      * Constructor with {@code multiplier} = 3.
-     * 
+     *
      * @param barSeries the bar series
      */
     public SuperTrendLowerBandIndicator(final BarSeries barSeries) {
@@ -50,7 +50,7 @@ public class SuperTrendLowerBandIndicator extends RecursiveCachedIndicator<Num> 
 
     /**
      * Constructor.
-     * 
+     *
      * @param barSeries    the bar series
      * @param atrIndicator the {@link ATRIndicator}
      * @param multiplier   the multiplier
@@ -59,14 +59,15 @@ public class SuperTrendLowerBandIndicator extends RecursiveCachedIndicator<Num> 
             final Double multiplier) {
         super(barSeries);
         this.atrIndicator = atrIndicator;
-        this.multiplier = numOf(multiplier);
+        this.multiplier = getBarSeries().numFactory().numOf(multiplier);
         this.medianPriceIndicator = new MedianPriceIndicator(barSeries);
     }
 
     @Override
     protected Num calculate(int index) {
-        if (index == 0)
-            return zero();
+        if (index == 0) {
+            return getBarSeries().numFactory().zero();
+        }
 
         Bar bar = getBarSeries().getBar(index - 1);
         Num previousValue = this.getValue(index - 1);

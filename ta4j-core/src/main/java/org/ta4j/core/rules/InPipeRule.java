@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -51,7 +51,7 @@ public class InPipeRule extends AbstractRule {
      * @param lower the lower threshold
      */
     public InPipeRule(Indicator<Num> ref, Number upper, Number lower) {
-        this(ref, ref.numOf(upper), ref.numOf(lower));
+        this(ref, ref.getBarSeries().numFactory().numOf(upper), ref.getBarSeries().numFactory().numOf(lower));
     }
 
     /**

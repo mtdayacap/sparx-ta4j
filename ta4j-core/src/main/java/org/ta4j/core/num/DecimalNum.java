@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -32,7 +32,6 @@ import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.Locale;
 import java.util.Objects;
-import java.util.function.Function;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -42,6 +41,9 @@ import org.slf4j.LoggerFactory;
  * consists of a {@code BigDecimal} with arbitrary {@link MathContext}
  * (precision and rounding mode).
  *
+ * <p>
+ * It uses a precision of up to {@value #DEFAULT_PRECISION} decimal places.
+ *
  * @see BigDecimal
  * @see MathContext
  * @see RoundingMode
@@ -49,19 +51,17 @@ import org.slf4j.LoggerFactory;
  */
 public final class DecimalNum implements Num {
 
-    private static final int DEFAULT_PRECISION = 32;
-    private static final Logger log = LoggerFactory.getLogger(DecimalNum.class);
+    private static final long serialVersionUID = 1L;
 
-    public static final DecimalNum ZERO = DecimalNum.valueOf(0);
-    private static final DecimalNum ONE = DecimalNum.valueOf(1);
-    private static final DecimalNum HUNDRED = DecimalNum.valueOf(100);
+    static final int DEFAULT_PRECISION = 32;
+    private static final Logger log = LoggerFactory.getLogger(DecimalNum.class);
 
     private final MathContext mathContext;
     private final BigDecimal delegate;
 
     /**
      * Constructor.
-     * 
+     *
      * <p>
      * Constructs the most precise {@code Num}, because it converts a {@code String}
      * to a {@code Num} with a precision of {@link #DEFAULT_PRECISION}; only a
@@ -77,7 +77,7 @@ public final class DecimalNum implements Num {
 
     /**
      * Constructor.
-     * 
+     *
      * <p>
      * Constructs a more precise {@code Num} than from {@code double}, because it
      * converts a {@code String} to a {@code Num} with a precision of
@@ -123,7 +123,7 @@ public final class DecimalNum implements Num {
 
     /**
      * Returns a {@code Num} version of the given {@code String}.
-     * 
+     *
      * <p>
      * Constructs the most precise {@code Num}, because it converts a {@code String}
      * to a {@code Num} with a precision of {@link #DEFAULT_PRECISION}; only a
@@ -158,7 +158,7 @@ public final class DecimalNum implements Num {
 
     /**
      * Returns a {@code Num} version of the given {@code Number}.
-     * 
+     *
      * <p>
      * Returns the most precise {@code Num}, because it first converts {@code val}
      * to a {@code String} and then to a {@code Num} with a precision of
@@ -175,7 +175,7 @@ public final class DecimalNum implements Num {
 
     /**
      * Returns a {@code DecimalNum} version of the given {@code DoubleNum}.
-     * 
+     *
      * <p>
      * Returns the most precise {@code Num}, because it first converts {@code val}
      * to a {@code String} and then to a {@code Num} with a precision of
@@ -187,7 +187,7 @@ public final class DecimalNum implements Num {
      * @throws NumberFormatException if {@code val} is {@code "NaN"}
      */
     public static DecimalNum valueOf(DoubleNum val) {
-        return valueOf(val.toString());
+        return valueOf(val.doubleValue());
     }
 
     /**
@@ -258,7 +258,7 @@ public final class DecimalNum implements Num {
 
     /**
      * Returns a {@code Num} version of the given {@code BigDecimal}.
-     * 
+     *
      * <p>
      * <b>Warning:</b> The {@code Num} returned may have inaccuracies because it
      * only inherits the precision of {@code val}.
@@ -282,26 +282,6 @@ public final class DecimalNum implements Num {
         return new DecimalNum(val, precision);
     }
 
-    @Override
-    public Num zero() {
-        return mathContext.getPrecision() == DEFAULT_PRECISION ? ZERO : function().apply(0);
-    }
-
-    @Override
-    public Num one() {
-        return mathContext.getPrecision() == DEFAULT_PRECISION ? ONE : function().apply(1);
-    }
-
-    @Override
-    public Num hundred() {
-        return mathContext.getPrecision() == DEFAULT_PRECISION ? HUNDRED : function().apply(100);
-    }
-
-    @Override
-    public Function<Number, Num> function() {
-        return (number -> DecimalNum.valueOf(number.toString(), mathContext.getPrecision()));
-    }
-
     /**
      * Returns the underlying {@link BigDecimal} delegate.
      *
@@ -310,6 +290,16 @@ public final class DecimalNum implements Num {
     @Override
     public BigDecimal getDelegate() {
         return delegate;
+    }
+
+    @Override
+    public NumFactory getNumFactory() {
+        return DecimalNumFactory.getInstance(mathContext.getPrecision());
+    }
+
+    @Override
+    public String getName() {
+        return this.getClass().getSimpleName();
     }
 
     /**
@@ -322,8 +312,8 @@ public final class DecimalNum implements Num {
     }
 
     @Override
-    public String getName() {
-        return this.getClass().getSimpleName();
+    public BigDecimal bigDecimalValue() {
+        return delegate;
     }
 
     @Override
@@ -430,7 +420,7 @@ public final class DecimalNum implements Num {
     /**
      * Returns a {@code Num} whose value is {@code √(this)} with {@code precision} =
      * {@link #DEFAULT_PRECISION}.
-     * 
+     *
      * @see DecimalNum#sqrt(int)
      */
     @Override
@@ -673,7 +663,7 @@ public final class DecimalNum implements Num {
     /**
      * <b>Warning:</b> This method returns {@code true} if {@code this} and
      * {@code obj} are both {@link NaN#NaN}.
-     * 
+     *
      * @return true if {@code this} object is the same as the {@code obj} argument,
      *         as defined by the {@link #compareTo(Num) compareTo} method; false
      *         otherwise.

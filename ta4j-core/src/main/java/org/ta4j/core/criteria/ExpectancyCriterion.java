@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -72,10 +72,10 @@ public class ExpectancyCriterion extends AbstractAnalysisCriterion {
     private Num calculate(BarSeries series, Num profitLossRatio, Num numberOfWinningPositions,
             Num numberOfAllPositions) {
         if (numberOfAllPositions.isZero() || profitLossRatio.isZero()) {
-            return series.zero();
+            return series.numFactory().zero();
         }
         // Expectancy = ((1 + AW/AL) * ProbabilityToWinOnePosition) - 1
-        Num one = series.one();
+        Num one = series.numFactory().one();
         Num probabiltyToWinOnePosition = numberOfWinningPositions.dividedBy(numberOfAllPositions);
         return (one.plus(profitLossRatio)).multipliedBy(probabiltyToWinOnePosition).minus(one);
     }

@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -59,9 +59,10 @@ public class PearsonCorrelationIndicator extends RecursiveCachedIndicator<Num> {
     @Override
     protected Num calculate(int index) {
 
-        Num n = numOf(barCount);
+        final var numFactory = getBarSeries().numFactory();
+        Num n = numFactory.numOf(barCount);
 
-        Num zero = zero();
+        Num zero = numFactory.zero();
         Num Sx = zero;
         Num Sy = zero;
         Num Sxx = zero;
@@ -84,7 +85,7 @@ public class PearsonCorrelationIndicator extends RecursiveCachedIndicator<Num> {
         Num toSqrt = (n.multipliedBy(Sxx).minus(Sx.multipliedBy(Sx)))
                 .multipliedBy(n.multipliedBy(Syy).minus(Sy.multipliedBy(Sy)));
 
-        if (toSqrt.isGreaterThan(zero())) {
+        if (toSqrt.isGreaterThan(numFactory.zero())) {
             // pearson = (n * Sxy - Sx * Sy) / sqrt((n * Sxx - Sx * Sx) * (n * Syy - Sy *
             // Sy))
             return (n.multipliedBy(Sxy).minus(Sx.multipliedBy(Sy))).dividedBy(toSqrt.sqrt());

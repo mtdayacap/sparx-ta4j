@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -39,7 +39,7 @@ public class IsRisingRule extends AbstractRule {
     /** The barCount */
     private final int barCount;
 
-    /** The minimum required strenght of the rising */
+    /** The minimum required strength of the rising */
     private final double minStrength;
 
     /**
@@ -57,7 +57,7 @@ public class IsRisingRule extends AbstractRule {
      *
      * @param ref         the indicator
      * @param barCount    the time frame
-     * @param minStrenght the minimum required rising strenght (between '0' and '1',
+     * @param minStrenght the minimum required rising strength (between '0' and '1',
      *                    e.g. '1' for strict rising)
      */
     public IsRisingRule(Indicator<Num> ref, int barCount, double minStrenght) {

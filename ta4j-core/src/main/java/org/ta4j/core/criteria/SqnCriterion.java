@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -85,7 +85,7 @@ public class SqnCriterion extends AbstractAnalysisCriterion {
     public Num calculate(BarSeries series, Position position) {
         Num stdDevPnl = standardDeviationCriterion.calculate(series, position);
         if (stdDevPnl.isZero()) {
-            return series.zero();
+            return series.numFactory().zero();
         }
         // SQN = (Average (PnL) / StdDev(PnL)) * SquareRoot(NumberOfTrades)
         Num numberOfPositions = numberOfPositionsCriterion.calculate(series, position);
@@ -97,18 +97,18 @@ public class SqnCriterion extends AbstractAnalysisCriterion {
     @Override
     public Num calculate(BarSeries series, TradingRecord tradingRecord) {
         if (tradingRecord.getPositions().isEmpty()) {
-            return series.zero();
+            return series.numFactory().zero();
         }
         Num stdDevPnl = standardDeviationCriterion.calculate(series, tradingRecord);
         if (stdDevPnl.isZero()) {
-            return series.zero();
+            return series.numFactory().zero();
         }
 
         Num numberOfPositions = numberOfPositionsCriterion.calculate(series, tradingRecord);
         Num pnl = criterion.calculate(series, tradingRecord);
         Num avgPnl = pnl.dividedBy(numberOfPositions);
-        if (nPositions != null && numberOfPositions.isGreaterThan(series.hundred())) {
-            numberOfPositions = series.numOf(nPositions);
+        if (nPositions != null && numberOfPositions.isGreaterThan(series.numFactory().hundred())) {
+            numberOfPositions = series.numFactory().numOf(nPositions);
         }
         // SQN = (Average (PnL) / StdDev(PnL)) * SquareRoot(NumberOfTrades)
         return avgPnl.dividedBy(stdDevPnl).multipliedBy(numberOfPositions.sqrt());

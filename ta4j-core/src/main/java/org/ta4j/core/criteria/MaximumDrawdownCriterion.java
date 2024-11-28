@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -30,7 +30,7 @@ import org.ta4j.core.analysis.CashFlow;
 import org.ta4j.core.num.Num;
 
 /**
- * Maximum drawdown criterion (in percentage).
+ * Maximum drawdown criterion, returned in decimal format.
  *
  * <p>
  * The maximum drawdown measures the largest loss. Its value can be within the
@@ -45,7 +45,7 @@ public class MaximumDrawdownCriterion extends AbstractAnalysisCriterion {
     @Override
     public Num calculate(BarSeries series, Position position) {
         if (position == null || position.getEntry() == null || position.getExit() == null) {
-            return series.zero();
+            return series.numFactory().zero();
         }
         CashFlow cashFlow = new CashFlow(series, position);
         return calculateMaximumDrawdown(series, null, cashFlow);
@@ -82,7 +82,7 @@ public class MaximumDrawdownCriterion extends AbstractAnalysisCriterion {
      */
     private Num calculateMaximumDrawdown(BarSeries series, TradingRecord tradingRecord, CashFlow cashFlow) {
 
-        Num zero = series.zero();
+        Num zero = series.numFactory().zero();
         Num maxPeak = zero;
         Num maximumDrawdown = zero;
 

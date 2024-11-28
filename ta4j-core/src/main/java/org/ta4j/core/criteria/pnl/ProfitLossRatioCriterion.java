@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -43,13 +43,13 @@ public class ProfitLossRatioCriterion extends AbstractAnalysisCriterion {
     public Num calculate(BarSeries series, Position position) {
         Num averageProfit = averageProfitCriterion.calculate(series, position);
         if (averageProfit.isZero()) {
-            // only loosing positions means a ratio of 0
-            return series.zero();
+            // only losing positions means a ratio of 0
+            return series.numFactory().zero();
         }
         Num averageLoss = averageLossCriterion.calculate(series, position);
         if (averageLoss.isZero()) {
             // only winning positions means a ratio of 1
-            return series.one();
+            return series.numFactory().one();
         }
         return averageProfit.dividedBy(averageLoss).abs();
     }
@@ -58,13 +58,13 @@ public class ProfitLossRatioCriterion extends AbstractAnalysisCriterion {
     public Num calculate(BarSeries series, TradingRecord tradingRecord) {
         Num averageProfit = averageProfitCriterion.calculate(series, tradingRecord);
         if (averageProfit.isZero()) {
-            // only loosing positions means a ratio of 0
-            return series.zero();
+            // only losing positions means a ratio of 0
+            return series.numFactory().zero();
         }
         Num averageLoss = averageLossCriterion.calculate(series, tradingRecord);
         if (averageLoss.isZero()) {
             // only winning positions means a ratio of 1
-            return series.one();
+            return series.numFactory().one();
         }
         return averageProfit.dividedBy(averageLoss).abs();
     }

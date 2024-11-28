@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -21,32 +21,33 @@
  * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-package org.ta4j.core;
+package org.ta4j.core.bars;
 
 import static org.junit.Assert.assertEquals;
 
 import java.time.Duration;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.util.function.Function;
+import java.time.Instant;
 
 import org.junit.Test;
+import org.ta4j.core.BarSeries;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.num.Num;
+import org.ta4j.core.num.NumFactory;
 
 public class BaseBarBuilderTest extends AbstractIndicatorTest<BarSeries, Num> {
 
-    public BaseBarBuilderTest(Function<Number, Num> numFunction) {
-        super(numFunction);
+    public BaseBarBuilderTest(NumFactory numFactory) {
+        super(numFactory);
     }
 
     @Test
     public void testBuildBar() {
-        final ZonedDateTime beginTime = ZonedDateTime.of(2014, 6, 25, 0, 0, 0, 0, ZoneId.systemDefault());
-        final ZonedDateTime endTime = ZonedDateTime.of(2014, 6, 25, 1, 0, 0, 0, ZoneId.systemDefault());
+
+        final Instant beginTime = Instant.parse("2014-06-25T00:00:00Z");
+        final Instant endTime = Instant.parse("2014-06-25T01:00:00Z");
         final Duration duration = Duration.between(beginTime, endTime);
 
-        final BaseBar bar = new BaseBarBuilder().timePeriod(duration)
+        final BaseBar bar = new BaseBarBuilder(numFactory).timePeriod(duration)
                 .endTime(endTime)
                 .openPrice(numOf(101))
                 .highPrice(numOf(103))

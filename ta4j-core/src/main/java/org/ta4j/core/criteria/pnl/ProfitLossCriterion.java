@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -30,7 +30,7 @@ import org.ta4j.core.criteria.AbstractAnalysisCriterion;
 import org.ta4j.core.num.Num;
 
 /**
- * Net Profit and loss criterion (absolute PnL, excludes trading costs).
+ * Net Profit and loss criterion (absolute PnL, includes trading costs).
  *
  * <p>
  * The profit or loss over the provided {@link BarSeries series}.
@@ -48,7 +48,7 @@ public class ProfitLossCriterion extends AbstractAnalysisCriterion {
                 .stream()
                 .filter(Position::isClosed)
                 .map(position -> calculate(series, position))
-                .reduce(series.zero(), Num::plus);
+                .reduce(series.numFactory().zero(), Num::plus);
     }
 
     /** The higher the criterion value, the better. */

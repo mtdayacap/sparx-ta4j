@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -57,8 +57,8 @@ public class CCICorrectionStrategy {
 
         CCIIndicator longCci = new CCIIndicator(series, 200);
         CCIIndicator shortCci = new CCIIndicator(series, 5);
-        Num plus100 = series.hundred();
-        Num minus100 = series.numOf(-100);
+        Num plus100 = series.numFactory().hundred();
+        Num minus100 = series.numFactory().numOf(-100);
 
         Rule entryRule = new OverIndicatorRule(longCci, plus100) // Bull trend
                 .and(new UnderIndicatorRule(shortCci, minus100)); // Signal

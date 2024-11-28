@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -75,7 +75,6 @@ public class DPOIndicator extends CachedIndicator<Num> {
         final SMAIndicator simpleMovingAverage = new SMAIndicator(price, barCount);
         final PreviousValueIndicator previousSimpleMovingAverage = new PreviousValueIndicator(simpleMovingAverage,
                 timeFrame);
-
         this.indicatorMinusPreviousSMAIndicator = CombineIndicator.minus(price, previousSimpleMovingAverage);
         this.name = String.format("%s barCount: %s", getClass().getSimpleName(), barCount);
     }

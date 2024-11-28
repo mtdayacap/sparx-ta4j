@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -171,8 +171,8 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
         this.barCount = barCount;
         this.type = type;
         this.strictType = null;
-        this.minStrength = numOf(Math.min(1, Math.abs(minStrength)));
-        this.minSlope = numOf(minSlope);
+        this.minStrength = getBarSeries().numFactory().numOf(Math.min(1, Math.abs(minStrength)));
+        this.minSlope = getBarSeries().numFactory().numOf(minSlope);
     }
 
     /**
@@ -185,14 +185,7 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
      */
     public ConvergenceDivergenceIndicator(Indicator<Num> ref, Indicator<Num> other, int barCount,
             ConvergenceDivergenceType type) {
-        super(ref);
-        this.ref = ref;
-        this.other = other;
-        this.barCount = barCount;
-        this.type = type;
-        this.strictType = null;
-        this.minStrength = numOf(0.8).abs();
-        this.minSlope = numOf(0.3);
+        this(ref, other, barCount, type, 0.8, 0.3);
     }
 
     /**
@@ -255,9 +248,10 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
         return false;
     }
 
+    /** @return {@link #barCount} */
     @Override
     public int getUnstableBars() {
-        return 0;
+        return barCount;
     }
 
     /**
@@ -327,7 +321,8 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
         boolean isConvergent = cc.getValue(index).isGreaterThanOrEqual(minStrength);
 
         Num slope = calculateSlopeRel(index);
-        boolean isNegative = slope.isLessThanOrEqual(minSlope.abs().multipliedBy(numOf(-1)));
+        boolean isNegative = slope
+                .isLessThanOrEqual(minSlope.abs().multipliedBy(getBarSeries().numFactory().minusOne()));
 
         return isConvergent && isNegative;
     }
@@ -339,7 +334,8 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
     private Boolean calculatePositiveDivergence(int index) {
 
         CorrelationCoefficientIndicator cc = new CorrelationCoefficientIndicator(ref, other, barCount);
-        boolean isDivergent = cc.getValue(index).isLessThanOrEqual(minStrength.multipliedBy(numOf(-1)));
+        boolean isDivergent = cc.getValue(index)
+                .isLessThanOrEqual(minStrength.multipliedBy(getBarSeries().numFactory().minusOne()));
 
         if (isDivergent) {
             // If "isDivergent" and "ref" is positive, then "other" must be negative.
@@ -357,12 +353,13 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
     private Boolean calculateNegativeDivergence(int index) {
 
         CorrelationCoefficientIndicator cc = new CorrelationCoefficientIndicator(ref, other, barCount);
-        boolean isDivergent = cc.getValue(index).isLessThanOrEqual(minStrength.multipliedBy(numOf(-1)));
+        boolean isDivergent = cc.getValue(index)
+                .isLessThanOrEqual(minStrength.multipliedBy(getBarSeries().numFactory().numOf(-1)));
 
         if (isDivergent) {
             // If "isDivergent" and "ref" is positive, then "other" must be negative.
             Num slope = calculateSlopeRel(index);
-            return slope.isLessThanOrEqual(minSlope.abs().multipliedBy(numOf(-1)));
+            return slope.isLessThanOrEqual(minSlope.abs().multipliedBy(getBarSeries().numFactory().numOf(-1)));
         }
 
         return false;

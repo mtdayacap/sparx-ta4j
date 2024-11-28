@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -58,7 +58,9 @@ public class ROCIndicator extends CachedIndicator<Num> {
         int nIndex = Math.max(index - barCount, 0);
         Num nPeriodsAgoValue = indicator.getValue(nIndex);
         Num currentValue = indicator.getValue(index);
-        return currentValue.minus(nPeriodsAgoValue).dividedBy(nPeriodsAgoValue).multipliedBy(hundred());
+        return currentValue.minus(nPeriodsAgoValue)
+                .dividedBy(nPeriodsAgoValue)
+                .multipliedBy(getBarSeries().numFactory().hundred());
     }
 
     @Override

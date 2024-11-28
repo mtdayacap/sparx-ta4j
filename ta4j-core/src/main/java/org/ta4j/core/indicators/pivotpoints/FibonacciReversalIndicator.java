@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -35,8 +35,8 @@ import org.ta4j.core.num.Num;
  * Fibonacci Reversal Indicator.
  *
  * @see <a href=
- *      "http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:pivot_points">
- *      http://stockcharts.com/school/doku.php?id=chart_school:technical_indicators:pivot_points</a>
+ *      "https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/pivot-points">
+ *      https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/pivot-points</a>
  */
 public class FibonacciReversalIndicator extends RecursiveCachedIndicator<Num> {
 
@@ -80,7 +80,7 @@ public class FibonacciReversalIndicator extends RecursiveCachedIndicator<Num> {
             FibReversalTyp fibReversalTyp) {
         super(pivotPointIndicator);
         this.pivotPointIndicator = pivotPointIndicator;
-        this.fibonacciFactor = numOf(fibonacciFactor);
+        this.fibonacciFactor = getBarSeries().numFactory().numOf(fibonacciFactor);
         this.fibReversalTyp = fibReversalTyp;
     }
 

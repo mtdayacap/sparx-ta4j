@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -24,6 +24,7 @@
 package org.ta4j.core.indicators;
 
 import org.ta4j.core.Indicator;
+import org.ta4j.core.indicators.numeric.NumericIndicator;
 import org.ta4j.core.num.Num;
 
 /**
@@ -41,7 +42,7 @@ public class MACDIndicator extends CachedIndicator<Num> {
 
     /**
      * Constructor with:
-     * 
+     *
      * <ul>
      * <li>{@code shortBarCount} = 12
      * <li>{@code longBarCount} = 26
@@ -81,6 +82,22 @@ public class MACDIndicator extends CachedIndicator<Num> {
      */
     public EMAIndicator getLongTermEma() {
         return longTermEma;
+    }
+
+    /**
+     * @param barCount of signal line
+     * @return signal line for this MACD indicator
+     */
+    public EMAIndicator getSignalLine(int barCount) {
+        return new EMAIndicator(this, barCount);
+    }
+
+    /**
+     * @param barCount of signal line
+     * @return histogram of this MACD indicator
+     */
+    public NumericIndicator getHistogram(int barCount) {
+        return NumericIndicator.of(this).minus(getSignalLine(barCount));
     }
 
     @Override
