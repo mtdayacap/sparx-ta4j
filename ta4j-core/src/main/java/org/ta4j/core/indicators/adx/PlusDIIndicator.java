@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -26,12 +26,12 @@ package org.ta4j.core.indicators.adx;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.indicators.ATRIndicator;
 import org.ta4j.core.indicators.CachedIndicator;
-import org.ta4j.core.indicators.MMAIndicator;
+import org.ta4j.core.indicators.averages.MMAIndicator;
 import org.ta4j.core.num.Num;
 
 /**
  * +DI indicator.
- * 
+ *
  * <p>
  * Part of the Directional Movement System.
  *
@@ -49,7 +49,7 @@ public class PlusDIIndicator extends CachedIndicator<Num> {
 
     /**
      * Constructor.
-     * 
+     *
      * @param series   the bar series
      * @param barCount the bar count for {@link #atrIndicator} and
      *                 {@link #avgPlusDMIndicator}
@@ -63,11 +63,18 @@ public class PlusDIIndicator extends CachedIndicator<Num> {
 
     @Override
     protected Num calculate(int index) {
-        return avgPlusDMIndicator.getValue(index).dividedBy(atrIndicator.getValue(index)).multipliedBy(numOf(100));
+        final var atrIndicatorValue = atrIndicator.getValue(index);
+        if (atrIndicatorValue.equals(getBarSeries().numFactory().zero())) {
+            return getBarSeries().numFactory().zero();
+        }
+
+        return avgPlusDMIndicator.getValue(index)
+                .dividedBy(atrIndicatorValue)
+                .multipliedBy(getBarSeries().numFactory().hundred());
     }
 
     @Override
-    public int getUnstableBars() {
+    public int getCountOfUnstableBars() {
         return barCount;
     }
 

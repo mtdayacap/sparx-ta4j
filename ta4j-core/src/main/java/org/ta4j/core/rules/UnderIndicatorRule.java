@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -50,7 +50,8 @@ public class UnderIndicatorRule extends AbstractRule {
      * @param threshold the threshold
      */
     public UnderIndicatorRule(Indicator<Num> indicator, Number threshold) {
-        this(indicator, new ConstantIndicator<>(indicator.getBarSeries(), indicator.numOf(threshold)));
+        this(indicator, new ConstantIndicator<>(indicator.getBarSeries(),
+                indicator.getBarSeries().numFactory().numOf(threshold)));
     }
 
     /**

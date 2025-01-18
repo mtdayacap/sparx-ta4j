@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -23,12 +23,13 @@
  */
 package org.ta4j.core.indicators;
 
+import static org.ta4j.core.num.NaN.NaN;
+
 import org.ta4j.core.BarSeries;
+import org.ta4j.core.indicators.averages.SMAIndicator;
 import org.ta4j.core.indicators.candles.RealBodyIndicator;
 import org.ta4j.core.indicators.helpers.TransformIndicator;
 import org.ta4j.core.num.Num;
-
-import static org.ta4j.core.num.NaN.NaN;
 
 /**
  * IntraDay Momentum Index Indicator.
@@ -71,7 +72,7 @@ public class IntraDayMomentumIndexIndicator extends CachedIndicator<Num> {
     @Override
     protected Num calculate(int index) {
         // Return NaN for unstable bars
-        if (index < this.getUnstableBars()) {
+        if (index < this.getCountOfUnstableBars()) {
             return NaN;
         }
 
@@ -80,11 +81,12 @@ public class IntraDayMomentumIndexIndicator extends CachedIndicator<Num> {
         Num avgOpenCloseValue = this.averageOpenCloseDiff.getValue(index);
 
         // Calculate the momentum index
-        return avgCloseOpenValue.dividedBy((avgCloseOpenValue.plus(avgOpenCloseValue))).multipliedBy(hundred());
+        return avgCloseOpenValue.dividedBy((avgCloseOpenValue.plus(avgOpenCloseValue)))
+                .multipliedBy(getBarSeries().numFactory().hundred());
     }
 
     @Override
-    public int getUnstableBars() {
+    public int getCountOfUnstableBars() {
         return this.barCount;
     }
 }

@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -25,10 +25,14 @@ package org.ta4j.core.indicators.helpers;
 
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.CachedIndicator;
+import org.ta4j.core.num.NaN;
 import org.ta4j.core.num.Num;
 
 /**
- * Returns the previous (n-th) value of an indicator.
+ * Returns the (n-th) previous value of an indicator.
+ *
+ * If the (n-th) previous index is below the first index from the bar series,
+ * then {@link NaN#NaN} is returned.
  */
 public class PreviousValueIndicator extends CachedIndicator<Num> {
 
@@ -61,13 +65,14 @@ public class PreviousValueIndicator extends CachedIndicator<Num> {
 
     @Override
     protected Num calculate(int index) {
-        int previousValue = Math.max(0, (index - n));
-        return this.indicator.getValue(previousValue);
+        int previousIndex = index - n;
+        return previousIndex < 0 ? NaN.NaN : indicator.getValue(previousIndex);
     }
 
+    /** @return {@link #n} */
     @Override
-    public int getUnstableBars() {
-        return 0;
+    public int getCountOfUnstableBars() {
+        return n;
     }
 
     @Override

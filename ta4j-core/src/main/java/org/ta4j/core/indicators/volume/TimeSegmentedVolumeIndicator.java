@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -23,13 +23,12 @@
  */
 package org.ta4j.core.indicators.volume;
 
+import static org.ta4j.core.num.NaN.NaN;
+
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.indicators.CachedIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceDifferenceIndicator;
-import org.ta4j.core.indicators.helpers.VolumeIndicator;
 import org.ta4j.core.num.Num;
-
-import static org.ta4j.core.num.NaN.NaN;
 
 /**
  * Time Segmented Volume (TSV) indicator.
@@ -65,11 +64,11 @@ public class TimeSegmentedVolumeIndicator extends CachedIndicator<Num> {
     @Override
     protected Num calculate(int index) {
         // If the index is less than the required unstable bars, return NaN
-        if (index < this.getUnstableBars()) {
+        if (index < this.getCountOfUnstableBars()) {
             return NaN;
         }
 
-        Num tsv = zero();
+        Num tsv = getBarSeries().numFactory().zero();
 
         // Calculate the TSV for the given period
         int startIndex = Math.max(0, index - barCount + 1);
@@ -84,7 +83,7 @@ public class TimeSegmentedVolumeIndicator extends CachedIndicator<Num> {
     }
 
     @Override
-    public int getUnstableBars() {
+    public int getCountOfUnstableBars() {
         return barCount;
     }
 

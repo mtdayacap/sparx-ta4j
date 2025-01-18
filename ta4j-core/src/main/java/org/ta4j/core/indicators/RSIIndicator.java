@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -24,6 +24,7 @@
 package org.ta4j.core.indicators;
 
 import org.ta4j.core.Indicator;
+import org.ta4j.core.indicators.averages.MMAIndicator;
 import org.ta4j.core.indicators.helpers.GainIndicator;
 import org.ta4j.core.indicators.helpers.LossIndicator;
 import org.ta4j.core.num.Num;
@@ -41,7 +42,7 @@ public class RSIIndicator extends CachedIndicator<Num> {
 
     /**
      * Constructor.
-     * 
+     *
      * @param indicator the {@link Indicator}
      * @param barCount  the time frame
      */
@@ -56,16 +57,17 @@ public class RSIIndicator extends CachedIndicator<Num> {
         // compute relative strength
         Num averageGain = averageGainIndicator.getValue(index);
         Num averageLoss = averageLossIndicator.getValue(index);
+        final var numFactory = getBarSeries().numFactory();
         if (averageLoss.isZero()) {
-            return averageGain.isZero() ? zero() : hundred();
+            return averageGain.isZero() ? numFactory.zero() : numFactory.hundred();
         }
         Num relativeStrength = averageGain.dividedBy(averageLoss);
         // compute relative strength index
-        return hundred().minus(hundred().dividedBy(one().plus(relativeStrength)));
+        return numFactory.hundred().minus(numFactory.hundred().dividedBy(numFactory.one().plus(relativeStrength)));
     }
 
     @Override
-    public int getUnstableBars() {
+    public int getCountOfUnstableBars() {
         return 0;
     }
 }

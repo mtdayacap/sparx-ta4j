@@ -1,7 +1,7 @@
-/**
+/*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2023 Ta4j Organization & respective
+ * Copyright (c) 2017-2024 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -34,13 +34,12 @@ import org.ta4j.core.num.Num;
  */
 public class SuperTrendIndicator extends RecursiveCachedIndicator<Num> {
 
-    private final Num ZERO = zero();
     private final SuperTrendUpperBandIndicator superTrendUpperBandIndicator;
     private final SuperTrendLowerBandIndicator superTrendLowerBandIndicator;
 
     /**
      * Constructor with {@code barCount} = 10 and {@code multiplier} = 3.
-     * 
+     *
      * @param series the bar series
      */
     public SuperTrendIndicator(final BarSeries series) {
@@ -49,7 +48,7 @@ public class SuperTrendIndicator extends RecursiveCachedIndicator<Num> {
 
     /**
      * Constructor.
-     * 
+     *
      * @param series     the bar series
      * @param barCount   the time frame for the {@code ATRIndicator}
      * @param multiplier the multiplier for the
@@ -65,9 +64,10 @@ public class SuperTrendIndicator extends RecursiveCachedIndicator<Num> {
 
     @Override
     protected Num calculate(int i) {
-        Num value = ZERO;
-        if (i == 0)
+        Num value = getBarSeries().numFactory().zero();
+        if (i == 0) {
             return value;
+        }
 
         Bar bar = getBarSeries().getBar(i);
         Num closePrice = bar.getClosePrice();
@@ -76,7 +76,7 @@ public class SuperTrendIndicator extends RecursiveCachedIndicator<Num> {
         Num upperBand = superTrendUpperBandIndicator.getValue(i);
 
         if (previousValue.isEqual(superTrendUpperBandIndicator.getValue(i - 1))) {
-            if (closePrice.isLessThan(upperBand)) {
+            if (closePrice.isLessThanOrEqual(upperBand)) {
                 value = upperBand;
             } else if (closePrice.isGreaterThan(upperBand)) {
                 value = lowerBand;
@@ -84,7 +84,7 @@ public class SuperTrendIndicator extends RecursiveCachedIndicator<Num> {
         }
 
         if (previousValue.isEqual(superTrendLowerBandIndicator.getValue(i - 1))) {
-            if (closePrice.isGreaterThan(lowerBand)) {
+            if (closePrice.isGreaterThanOrEqual(lowerBand)) {
                 value = lowerBand;
             } else if (closePrice.isLessThan(lowerBand)) {
                 value = upperBand;
@@ -95,7 +95,7 @@ public class SuperTrendIndicator extends RecursiveCachedIndicator<Num> {
     }
 
     @Override
-    public int getUnstableBars() {
+    public int getCountOfUnstableBars() {
         return 0;
     }
 
