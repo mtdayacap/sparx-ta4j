@@ -33,8 +33,8 @@ import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Strategy;
 import org.ta4j.core.Trade;
 import org.ta4j.core.TradingRecord;
-import org.ta4j.core.bars.BaseBarBuilder;
-import org.ta4j.core.indicators.SMAIndicator;
+import org.ta4j.core.bars.TimeBarBuilder;
+import org.ta4j.core.indicators.averages.SMAIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.num.DecimalNum;
 import org.ta4j.core.num.DecimalNumFactory;
@@ -120,7 +120,7 @@ public class TradingBotOnMovingBarSeries {
         Num highPrice = openPrice.plus(maxRange.multipliedBy(DecimalNum.valueOf(Math.random())));
         Num closePrice = randDecimal(lowPrice, highPrice);
         LAST_BAR_CLOSE_PRICE = closePrice;
-        return new BaseBarBuilder(DecimalNumFactory.getInstance()).amount(1)
+        return new TimeBarBuilder(DecimalNumFactory.getInstance()).amount(1)
                 .volume(1)
                 .timePeriod(Duration.ofDays(1))
                 .endTime(Instant.now())
