@@ -19,11 +19,11 @@ public class CompoundedAnnualGrowthReturnCriteria extends AbstractAnalysisCriter
   @Override
   public Num calculate(BarSeries series, TradingRecord tradingRecord) {
     Num grossReturn = new ReturnCriterion().calculate(series, tradingRecord);
-    double cagr = calculateCagr(series, grossReturn);
+    Double cagr = calculateCagr(series, grossReturn);
     return DoubleNum.valueOf(cagr);
   }
 
-  private double calculateCagr(BarSeries series, Num grossReturn) {
+  public Double calculateCagr(BarSeries series, Num grossReturn) {
     int holdingPeriod = getHoldingPeriod(series);
     return Math.pow(grossReturn.doubleValue(), (1.0 / holdingPeriod)) - 1;
   }
