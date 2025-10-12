@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -31,6 +31,9 @@ import org.ta4j.core.num.Num;
 /**
  * Satisfied when the value of the first {@link Indicator indicator} is equal to
  * the value of the second one.
+ *
+ * <p>
+ * This rule does not use the {@code tradingRecord}.
  */
 public class IsEqualRule extends AbstractRule {
 

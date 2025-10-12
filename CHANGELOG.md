@@ -1,6 +1,50 @@
 Changelog for `ta4j`, roughly following [keepachangelog.com](http://keepachangelog.com/en/1.0.0/) from version 0.9 onwards.
 
-## 0.18
+## Unreleased
+
+### Changed
+- [#1399](https://github.com/ta4j/ta4j/issues/1399) Refresh dependencies, plugins, and build tooling while enforcing Java 21 and Maven 3.9+.
+
+## 0.19
+
+### Breaking
+- Refactored `ProfitLossCriterion`, `ProfitCriterion`, `LossCriterion`, `AverageProfitCriterion`, `AverageLossCriterion`, `ReturnCriterion`, `ProfitLossRatioCriterion` and `ProfitLossPercentageCriterion` criteria into their net and gross concrete classes
+- [#1266](https://github.com/ta4j/ta4j/issues/1266) Consolidated BinaryOperation, UnaryOperation, TransformIndicator and CombineIndicator
+- Moved `criteria/MaximumDrawdownCriterion.java` and `criteria/ReturnOverMaxDrawdownCriterion.java` to `criteria/drawdown/` sub-package
+
+### Fixed
+- Updated Github test workflow to cache dependencies for quicker builds
+- Updated test status badge on README
+- Fixed EnterAndHoldCriterion to keep track of transaction and hold costs
+- Clarify PnL criterion comments about trading costs
+- Refactor ProfitLossPercentageCriterion to calculate aggregated return
+- Fixed strict rules of `ConvergenceDivergenceIndicator`
+- Fixed calculation of `ReturnOverMaxDrawdownCriterion`
+- swapped parameter naming in  `BaseBarSeries#addTrade(final Number tradeVolume, final Number tradePrice)`
+- Aggregation of amount and trades in `VolumeBarBuilder` and `TickBarBuilder`
+- Corrected the calculation of unstable bars of the SMA indicator
+- `PivotPointIndicatorTest` fixed to work also in java 25
+
+### Changed
+- Use `NetReturnCriterion` in `AverageReturnPerBarCriterion`, `EnterAndHoldCriterion` and `ReturnOverMaxDrawdownCriterion` to avoid optimistic bias of `GrossReturnCriterion`
+- `ReturnOverMaxDrawdownCriterion` now returns 0 instead of `NaN` for strategies that never operate, and returns the net profit instead of `NaN` for strategies with no drawdown
+- Changed snapshot distribution to Maven Central after OSSRH end-of-life
+- `StopGainRule` and `StopLossRule` now accept any price `Indicator` instead of only `ClosePriceIndicator`
+
+### Removed/Deprecated
+- TransformIndicator and CombineIndicator
+
+### Added
+- Bars can now be built by `beginTime` instead of `endTime`
+- Added tests for `DoubleNumFactory` and `DecimalNumFactory`
+- Added `AmountBarBuilder` to `bars`-package to aggregate bars after a fixed number of amount have been traded
+- Added `CumulativePnL` and `MaximumAbsoluteDrawdownCriterion` to calculate the max drawdown absolute value, and `MaximumDrawdownBarLengthCriterion` to calculate its length
+- Added `MonteCarloMaximumDrawdownCriterion` to estimate drawdown risk distribution by simulating different trade orders
+- Added `CommissionsCriterion` to total the commissions paid across positions and `CommissionsImpactPercentageCriterion` to express how much those costs eat into gross profit
+- Added `MaxConsecutiveLossCriterion`, `MaxConsecutiveProfitCriterion`, `MaxPositionNetLossCriterion` and `MaxPositionNetProfitCriterion` to report the worst loss streaks, best win streaks, and extreme per-position outcomes in a record
+- Added `InPositionPercentageCriterion` to calculate the percentage of the time that a strategy remains invested
+
+## 0.18 (released May 15, 2025)
 
 ### Breaking
 - Updated project Java JDK from 11 > 21
@@ -32,6 +76,8 @@ Changelog for `ta4j`, roughly following [keepachangelog.com](http://keepachangel
 - Fixed `MockBarBuilder` to use `Instant.now` for beginTime
 - Fixed `RecentSwingHighIndicatorTest` to create bars consistently
 - Fixed `LSMAIndicator` to fix lsma calculation for incorrect values
+- Fixed `RSIIndicator` getCountOfUnstableBars to return barCount value instead of 0 
+- Fixed `RSIIndicator` calculate to return NaN during unstable period
 
 ### Changed
 - Updated **jfreechart** dependency in **ta4j-examples** project from 1.5.3 to 1.5.5 to resolve [CVE-2023-52070](https://ossindex.sonatype.org/vulnerability/CVE-2023-6481?component-type=maven&component-name=ch.qos.logback%2Flogback-core)
@@ -40,11 +86,16 @@ Changelog for `ta4j`, roughly following [keepachangelog.com](http://keepachangel
 - Faster test execution by using `String.lines()` instead of `String` concatenation
 - Improve Javadoc for `DecimalNum`and `DoubleNum`
 - Allowed JUnit5 for new tests. Old remain as is.
+- Updated `StochasticOscillatorKIndicator` constructor to use generic params
+- Updated `StochasticRSIIndicator` to use `StochasticOscillatorKIndicator` instead of duplicating the logic
+- Updated `TestUtils` assertIndicatorEquals and assertIndicatorNotEquals to handle NaN values
 
 ### Removed/Deprecated
 
 
 ### Added
+- added `HeikinAshiBarAggregator`: Heikin-Ashi bar aggregator implementation
+- added `HeikinAshiBarBuilder`: Heikin-Ashi bar builder implementation
 - added `Bar.getZonedBeginTime`: the bar's begin time usable as ZonedDateTime
 - added `Bar.getZonedEndTime`: the bar's end time usable as ZonedDateTime
 - added `Bar.getSystemZonedBeginTime`: the bar's begin time converted to system time zone
@@ -71,7 +122,7 @@ Changelog for `ta4j`, roughly following [keepachangelog.com](http://keepachangel
 - Added `KiJunV2Indicator` to `indicators.averages`-package: Kihon Moving Average (KiJunV2) indicator
 - Added `VIDYAIndicator` to `indicators.averages`-package: Chande’s Variable Index Dynamic Moving Average (VIDYA) indicator
 - Added `VWMAIndicator` to `indicators.averages`-package: Volume Weighted Moving Average (VWMA) indicator
-
+- added `AverageIndicator`
 
 ## 0.17 (released September 9, 2024)
 

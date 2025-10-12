@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -42,6 +42,9 @@ import org.ta4j.core.indicators.helpers.DateTimeIndicator;
  * time-line, typically measured in milliseconds. It is independent of time
  * zones, days of the week, or months. However, this rule converts a UTC to a
  * ZonedDateTime with UTC to get the day, week and month in that time zone.
+ *
+ * <p>
+ * This rule does not use the {@code tradingRecord}.
  */
 public class DayOfWeekRule extends AbstractRule {
 

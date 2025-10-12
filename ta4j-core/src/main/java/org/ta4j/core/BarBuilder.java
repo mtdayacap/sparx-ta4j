@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -31,13 +31,22 @@ import org.ta4j.core.num.Num;
 public interface BarBuilder {
 
     /**
-     * @param timePeriod the time period
+     * @param timePeriod the time period (optional if {@link #beginTime(Instant)}
+     *                   and {@link #endTime(Instant)} are given)
      * @return {@code this}
      */
     BarBuilder timePeriod(Duration timePeriod);
 
     /**
-     * @param endTime the end time of the bar period
+     * @param beginTime the begin time of the bar period (optional if
+     *                  {@link #endTime(Instant)} is given)
+     * @return {@code this}
+     */
+    BarBuilder beginTime(Instant beginTime);
+
+    /**
+     * @param endTime the end time of the bar period (optional if
+     *                {@link #beginTime(Instant)} is given)
      * @return {@code this}
      */
     BarBuilder endTime(Instant endTime);
@@ -133,19 +142,22 @@ public interface BarBuilder {
     BarBuilder volume(String volume);
 
     /**
-     * @param amount the total traded amount of the bar period
+     * @param amount the total traded amount of the bar period (if {@code null},
+     *               then it is calculated by {@code closePrice * volume})
      * @return {@code this}
      */
     BarBuilder amount(Num amount);
 
     /**
-     * @param amount the total traded amount of the bar period
+     * @param amount the total traded amount of the bar period (if {@code null},
+     *               then it is calculated by {@code closePrice * volume})
      * @return {@code this}
      */
     BarBuilder amount(Number amount);
 
     /**
-     * @param amount the total traded amount of the bar period
+     * @param amount the total traded amount of the bar period (if {@code null},
+     *               then it is calculated by {@code closePrice * volume})
      * @return {@code this}
      */
     BarBuilder amount(String amount);

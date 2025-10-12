@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -23,11 +23,15 @@
  */
 package ta4jexamples.analysis;
 
+import java.awt.GraphicsEnvironment;
+
+import org.junit.Assume;
 import org.junit.Test;
 
 public class BuyAndSellSignalsToChartTest {
     @Test
     public void test() {
+        Assume.assumeFalse("Headless environment", GraphicsEnvironment.isHeadless());
         BuyAndSellSignalsToChart.main(null);
     }
 

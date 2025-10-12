@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -32,6 +32,11 @@ public class VolumeBarBuilderFactory implements BarBuilderFactory {
     private final int volumeThreshold;
     private VolumeBarBuilder barBuilder;
 
+    /**
+     * Constructor.
+     *
+     * @param volumeThreshold the threshold at which a new bar should be created
+     */
     public VolumeBarBuilderFactory(final int volumeThreshold) {
         this.volumeThreshold = volumeThreshold;
     }

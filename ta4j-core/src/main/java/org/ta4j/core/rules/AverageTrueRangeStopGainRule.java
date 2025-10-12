@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -29,7 +29,7 @@ import org.ta4j.core.Position;
 import org.ta4j.core.TradingRecord;
 import org.ta4j.core.indicators.ATRIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
-import org.ta4j.core.indicators.helpers.TransformIndicator;
+import org.ta4j.core.indicators.numeric.BinaryOperation;
 import org.ta4j.core.num.Num;
 
 /**
@@ -38,6 +38,9 @@ import org.ta4j.core.num.Num;
  * <p>
  * Satisfied when a reference price (by default the close price) reaches the
  * gain threshold defined by a multiple of the Average True Range (ATR).
+ *
+ * <p>
+ * This rule uses the {@code tradingRecord}.
  */
 public class AverageTrueRangeStopGainRule extends AbstractRule {
 
@@ -65,9 +68,9 @@ public class AverageTrueRangeStopGainRule extends AbstractRule {
      * @param atrBarCount    the number of bars used for ATR calculation
      * @param atrCoefficient the multiple of ATR to set the gain threshold
      */
-    public AverageTrueRangeStopGainRule(BarSeries series, Indicator<Num> referencePrice, int atrBarCount,
-            Number atrCoefficient) {
-        this.stopGainThreshold = TransformIndicator.multiply(new ATRIndicator(series, atrBarCount), atrCoefficient);
+    public AverageTrueRangeStopGainRule(final BarSeries series, final Indicator<Num> referencePrice,
+            final int atrBarCount, final Number atrCoefficient) {
+        this.stopGainThreshold = BinaryOperation.product(new ATRIndicator(series, atrBarCount), atrCoefficient);
         this.referencePrice = referencePrice;
     }
 

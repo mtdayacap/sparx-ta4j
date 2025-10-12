@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -32,6 +32,11 @@ public class TickBarBuilderFactory implements BarBuilderFactory {
     private final int tickCount;
     private TickBarBuilder barBuilder;
 
+    /**
+     * Constructor.
+     *
+     * @param tickCount the number of ticks at which a new bar should be created
+     */
     public TickBarBuilderFactory(final int tickCount) {
         this.tickCount = tickCount;
     }

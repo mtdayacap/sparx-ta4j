@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -30,7 +30,7 @@ import org.ta4j.core.indicators.ATRIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.indicators.helpers.HighestValueIndicator;
 import org.ta4j.core.indicators.helpers.LowestValueIndicator;
-import org.ta4j.core.indicators.helpers.TransformIndicator;
+import org.ta4j.core.indicators.numeric.BinaryOperation;
 import org.ta4j.core.num.Num;
 
 /**
@@ -40,6 +40,9 @@ import org.ta4j.core.num.Num;
  * This rule is satisfied when the reference price reaches the loss threshold as
  * determined by a given multiple of the prevailing average true range. It can
  * be used for both long and short positions.
+ *
+ * <p>
+ * This rule uses the {@code tradingRecord}.
  */
 public class AverageTrueRangeTrailingStopLossRule extends AbstractRule {
 
@@ -72,9 +75,9 @@ public class AverageTrueRangeTrailingStopLossRule extends AbstractRule {
      * @param atrBarCount    the number of bars used for ATR calculation
      * @param atrCoefficient the coefficient to multiply ATR
      */
-    public AverageTrueRangeTrailingStopLossRule(BarSeries series, Indicator<Num> referencePrice, int atrBarCount,
-            Number atrCoefficient) {
-        this.stopLossThreshold = TransformIndicator.multiply(new ATRIndicator(series, atrBarCount), atrCoefficient);
+    public AverageTrueRangeTrailingStopLossRule(final BarSeries series, final Indicator<Num> referencePrice,
+            final int atrBarCount, final Number atrCoefficient) {
+        this.stopLossThreshold = BinaryOperation.product(new ATRIndicator(series, atrBarCount), atrCoefficient);
         this.referencePrice = referencePrice;
     }
 
@@ -88,6 +91,9 @@ public class AverageTrueRangeTrailingStopLossRule extends AbstractRule {
      * satisfied when the reference price is greater than the current trade's entry
      * price (net of fees) OR the lowest reference price since entry plus the
      * ATR-based stop loss threshold.
+     *
+     * <p>
+     * This rule uses the {@code tradingRecord}.
      *
      * @param index         the current bar index
      * @param tradingRecord the trading record

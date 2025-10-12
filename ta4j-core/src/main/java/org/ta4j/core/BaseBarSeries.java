@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -273,8 +273,8 @@ public class BaseBarSeries implements BarSeries {
     }
 
     @Override
-    public void addTrade(final Number price, final Number amount) {
-        addTrade(numFactory().numOf(price), numFactory().numOf(amount));
+    public void addTrade(final Number tradeVolume, final Number tradePrice) {
+        addTrade(numFactory().numOf(tradeVolume), numFactory().numOf(tradePrice));
     }
 
     @Override

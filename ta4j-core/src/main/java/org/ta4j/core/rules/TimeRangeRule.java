@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -40,6 +40,9 @@ import org.ta4j.core.indicators.helpers.DateTimeIndicator;
  * the week. However, this rule converts a UTC to a ZonedDateTime in the
  * system's default time zone and then to a LocalTime to get the local time in
  * that time zone.
+ *
+ * <p>
+ * This rule does not use the {@code tradingRecord}.
  */
 public class TimeRangeRule extends AbstractRule {
 

@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -23,13 +23,14 @@
  */
 package org.ta4j.core.bars;
 
+import org.ta4j.core.BarBuilder;
 import org.ta4j.core.BarBuilderFactory;
 import org.ta4j.core.BarSeries;
 
 public class TimeBarBuilderFactory implements BarBuilderFactory {
 
     @Override
-    public TimeBarBuilder createBarBuilder(BarSeries series) {
+    public BarBuilder createBarBuilder(BarSeries series) {
         return new TimeBarBuilder(series.numFactory()).bindTo(series);
     }
 }

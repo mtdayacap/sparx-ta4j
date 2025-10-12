@@ -1,7 +1,7 @@
 /*
  * The MIT License (MIT)
  *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
+ * Copyright (c) 2017-2025 Ta4j Organization & respective
  * authors (see AUTHORS)
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy of
@@ -25,8 +25,7 @@ package org.ta4j.core.indicators.averages;
 
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.CachedIndicator;
-import org.ta4j.core.indicators.helpers.CombineIndicator;
-import org.ta4j.core.indicators.helpers.TransformIndicator;
+import org.ta4j.core.indicators.numeric.BinaryOperation;
 import org.ta4j.core.num.Num;
 
 /**
@@ -50,10 +49,10 @@ public class HMAIndicator extends CachedIndicator<Num> {
         super(indicator);
         this.barCount = barCount;
 
-        WMAIndicator halfWma = new WMAIndicator(indicator, barCount / 2);
-        WMAIndicator origWma = new WMAIndicator(indicator, barCount);
+        final var halfWma = new WMAIndicator(indicator, barCount / 2);
+        final var origWma = new WMAIndicator(indicator, barCount);
 
-        Indicator<Num> indicatorForSqrtWma = CombineIndicator.minus(TransformIndicator.multiply(halfWma, 2), origWma);
+        final var indicatorForSqrtWma = BinaryOperation.difference(BinaryOperation.product(halfWma, 2), origWma);
         this.sqrtWma = new WMAIndicator(indicatorForSqrtWma,
                 getBarSeries().numFactory().numOf(barCount).sqrt().intValue());
     }
