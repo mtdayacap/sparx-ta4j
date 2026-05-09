@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core;
 
@@ -31,13 +11,22 @@ import org.ta4j.core.num.Num;
 public interface BarBuilder {
 
     /**
-     * @param timePeriod the time period
+     * @param timePeriod the time period (optional if {@link #beginTime(Instant)}
+     *                   and {@link #endTime(Instant)} are given)
      * @return {@code this}
      */
     BarBuilder timePeriod(Duration timePeriod);
 
     /**
-     * @param endTime the end time of the bar period
+     * @param beginTime the begin time of the bar period (optional if
+     *                  {@link #endTime(Instant)} is given)
+     * @return {@code this}
+     */
+    BarBuilder beginTime(Instant beginTime);
+
+    /**
+     * @param endTime the end time of the bar period (optional if
+     *                {@link #beginTime(Instant)} is given)
      * @return {@code this}
      */
     BarBuilder endTime(Instant endTime);
@@ -133,19 +122,22 @@ public interface BarBuilder {
     BarBuilder volume(String volume);
 
     /**
-     * @param amount the total traded amount of the bar period
+     * @param amount the total traded amount of the bar period (if {@code null},
+     *               then it is calculated by {@code closePrice * volume})
      * @return {@code this}
      */
     BarBuilder amount(Num amount);
 
     /**
-     * @param amount the total traded amount of the bar period
+     * @param amount the total traded amount of the bar period (if {@code null},
+     *               then it is calculated by {@code closePrice * volume})
      * @return {@code this}
      */
     BarBuilder amount(Number amount);
 
     /**
-     * @param amount the total traded amount of the bar period
+     * @param amount the total traded amount of the bar period (if {@code null},
+     *               then it is calculated by {@code closePrice * volume})
      * @return {@code this}
      */
     BarBuilder amount(String amount);
@@ -161,6 +153,35 @@ public interface BarBuilder {
      * @return {@code this}
      */
     BarBuilder trades(String trades);
+
+    /**
+     * Updates the builder with a trade event and adds or updates bars as needed.
+     *
+     * @param time        the trade timestamp (UTC)
+     * @param tradeVolume the traded volume
+     * @param tradePrice  the traded price
+     *
+     * @since 0.22.2
+     */
+    default void addTrade(Instant time, Num tradeVolume, Num tradePrice) {
+        throw new UnsupportedOperationException("Trade ingestion not supported by " + getClass().getSimpleName());
+    }
+
+    /**
+     * Updates the builder with a trade event and adds or updates bars as needed.
+     *
+     * @param time        the trade timestamp (UTC)
+     * @param tradeVolume the traded volume
+     * @param tradePrice  the traded price
+     * @param side        aggressor side (optional)
+     * @param liquidity   liquidity classification (optional)
+     *
+     * @since 0.22.2
+     */
+    default void addTrade(Instant time, Num tradeVolume, Num tradePrice, RealtimeBar.Side side,
+            RealtimeBar.Liquidity liquidity) {
+        addTrade(time, tradeVolume, tradePrice);
+    }
 
     /**
      * @param barSeries the series used for bar addition

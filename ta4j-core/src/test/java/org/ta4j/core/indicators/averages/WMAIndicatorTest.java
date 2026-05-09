@@ -1,34 +1,14 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.averages;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
 import org.junit.Test;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
-import org.ta4j.core.indicators.averages.WMAIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
@@ -46,8 +26,10 @@ public class WMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num>
         Indicator<Num> close = new ClosePriceIndicator(series);
         Indicator<Num> wmaIndicator = new WMAIndicator(close, 3);
 
-        assertNumEquals(1, wmaIndicator.getValue(0));
-        assertNumEquals(1.6667, wmaIndicator.getValue(1));
+        int unstableBars = wmaIndicator.getCountOfUnstableBars();
+        for (int i = 0; i < unstableBars; i++) {
+            assertThat(Num.isNaNOrNull(wmaIndicator.getValue(i))).isTrue();
+        }
         assertNumEquals(2.3333, wmaIndicator.getValue(2));
         assertNumEquals(3.3333, wmaIndicator.getValue(3));
         assertNumEquals(4.3333, wmaIndicator.getValue(4));
@@ -60,12 +42,9 @@ public class WMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num>
         Indicator<Num> close = new ClosePriceIndicator(series);
         Indicator<Num> wmaIndicator = new WMAIndicator(close, 55);
 
-        assertNumEquals(1, wmaIndicator.getValue(0));
-        assertNumEquals(1.6667, wmaIndicator.getValue(1));
-        assertNumEquals(2.3333, wmaIndicator.getValue(2));
-        assertNumEquals(3, wmaIndicator.getValue(3));
-        assertNumEquals(3.6666, wmaIndicator.getValue(4));
-        assertNumEquals(4.3333, wmaIndicator.getValue(5));
+        for (int i = 0; i < series.getBarCount(); i++) {
+            assertThat(Num.isNaNOrNull(wmaIndicator.getValue(i))).isTrue();
+        }
     }
 
     @Test

@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.helpers;
 
@@ -46,7 +26,7 @@ public class ConvergenceDivergenceIndicatorTest {
     private Indicator<Num> refPosDiv;
     private Indicator<Num> otherNegDiv;
 
-    private Indicator<Num> refNegDig;
+    private Indicator<Num> refNegDiv;
     private Indicator<Num> otherPosDiv;
 
     private ConvergenceDivergenceIndicator isPosCon;
@@ -73,7 +53,7 @@ public class ConvergenceDivergenceIndicatorTest {
         refPosDiv = new FixedNumIndicator(series, 1, 4, 8, 12, 15, 20, 3, 2, -2, 1);
         otherNegDiv = new FixedNumIndicator(series, 80, 50, 20, -10, 0, -100, -200, -2, 5, 7);
 
-        refNegDig = new FixedNumIndicator(series, 100, 30, 15, 4, 2, -10, -3, -100, -2, 100);
+        refNegDiv = new FixedNumIndicator(series, 100, 30, 15, 4, 2, -10, -3, -100, -2, 100);
         otherPosDiv = new FixedNumIndicator(series, 20, 40, 70, 80, 90, 100, 200, 220, -50, 7);
 
         // for convergence and divergence
@@ -86,20 +66,20 @@ public class ConvergenceDivergenceIndicatorTest {
         isPosDiv = new ConvergenceDivergenceIndicator(refPosDiv, otherNegDiv, 3,
                 ConvergenceDivergenceType.positiveDivergent);
 
-        isNegDiv = new ConvergenceDivergenceIndicator(refNegDig, otherPosDiv, 3,
+        isNegDiv = new ConvergenceDivergenceIndicator(refNegDiv, otherPosDiv, 3,
                 ConvergenceDivergenceType.negativeDivergent);
 
         // for strict convergence and divergence
         isPosConStrict = new ConvergenceDivergenceIndicator(refPosCon, otherPosDiv, 3,
                 ConvergenceDivergenceStrictType.positiveConvergentStrict);
 
-        isNegConStrict = new ConvergenceDivergenceIndicator(refNegDig, otherNegCon, 3,
+        isNegConStrict = new ConvergenceDivergenceIndicator(refNegDiv, otherNegCon, 3,
                 ConvergenceDivergenceStrictType.negativeConvergentStrict);
 
-        isPosDivStrict = new ConvergenceDivergenceIndicator(otherPosDiv, refNegDig, 3,
+        isPosDivStrict = new ConvergenceDivergenceIndicator(otherPosDiv, refNegDiv, 3,
                 ConvergenceDivergenceStrictType.positiveDivergentStrict);
 
-        isNegDivStrict = new ConvergenceDivergenceIndicator(refNegDig, otherPosDiv, 3,
+        isNegDivStrict = new ConvergenceDivergenceIndicator(refNegDiv, otherPosDiv, 3,
                 ConvergenceDivergenceStrictType.negativeDivergentStrict);
 
     }
@@ -112,10 +92,10 @@ public class ConvergenceDivergenceIndicatorTest {
         testPositiveDivergent();
         testNegativeDivergent();
 
-        // testPositiveConvergentStrict();
-        // testNegativeConvergentStrict();
-        // testPositiveDivergentStrict();
-        // testNegativeDivergentStrict();
+        testPositiveConvergentStrict();
+        testNegativeConvergentStrict();
+        testPositiveDivergentStrict();
+        testNegativeDivergentStrict();
 
     }
 
@@ -180,7 +160,7 @@ public class ConvergenceDivergenceIndicatorTest {
         assertTrue(isPosConStrict.getValue(5));
         assertFalse(isPosConStrict.getValue(6));
         assertFalse(isPosConStrict.getValue(7));
-        assertTrue(isPosConStrict.getValue(8));
+        assertFalse(isPosConStrict.getValue(8));
         assertFalse(isPosConStrict.getValue(9));
     }
 
@@ -189,8 +169,8 @@ public class ConvergenceDivergenceIndicatorTest {
         assertFalse(isNegConStrict.getValue(1));
         assertFalse(isNegConStrict.getValue(2));
         assertTrue(isNegConStrict.getValue(3));
-        assertFalse(isNegConStrict.getValue(4));
-        assertFalse(isNegConStrict.getValue(5));
+        assertTrue(isNegConStrict.getValue(4));
+        assertTrue(isNegConStrict.getValue(5));
         assertFalse(isNegConStrict.getValue(6));
         assertFalse(isNegConStrict.getValue(7));
         assertFalse(isNegConStrict.getValue(8));
@@ -202,7 +182,7 @@ public class ConvergenceDivergenceIndicatorTest {
         assertFalse(isPosDivStrict.getValue(1));
         assertFalse(isPosDivStrict.getValue(2));
         assertTrue(isPosDivStrict.getValue(3));
-        assertFalse(isPosDivStrict.getValue(4));
+        assertTrue(isPosDivStrict.getValue(4));
         assertTrue(isPosDivStrict.getValue(5));
         assertFalse(isPosDivStrict.getValue(6));
         assertFalse(isPosDivStrict.getValue(7));
@@ -216,7 +196,7 @@ public class ConvergenceDivergenceIndicatorTest {
         assertFalse(isNegDivStrict.getValue(2));
         assertTrue(isNegDivStrict.getValue(3));
         assertTrue(isNegDivStrict.getValue(4));
-        assertFalse(isNegDivStrict.getValue(5));
+        assertTrue(isNegDivStrict.getValue(5));
         assertFalse(isNegDivStrict.getValue(6));
         assertFalse(isNegDivStrict.getValue(7));
         assertFalse(isNegDivStrict.getValue(8));

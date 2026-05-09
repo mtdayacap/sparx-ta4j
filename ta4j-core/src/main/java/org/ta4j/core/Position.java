@@ -1,30 +1,11 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core;
 
 import static org.ta4j.core.num.NaN.NaN;
 
+import java.io.Serial;
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -34,7 +15,8 @@ import org.ta4j.core.analysis.cost.ZeroCostModel;
 import org.ta4j.core.num.Num;
 
 /**
- * A {@code Position} is a pair of two {@link Trade trades}.
+ * A {@code Position} models either a closed entry/exit pair or an open position
+ * snapshot with only an entry trade.
  *
  * <p>
  * The exit trade has the complement type of the entry trade, i.e.:
@@ -42,9 +24,15 @@ import org.ta4j.core.num.Num;
  * <li>entry == BUY --> exit == SELL
  * <li>entry == SELL --> exit == BUY
  * </ul>
+ *
+ * <p>
+ * Open-position inspection APIs on {@link TradingRecord} also use this type, so
+ * callers can query per-lot and net exposure through one consistent contract.
+ * </p>
  */
 public class Position implements Serializable {
 
+    @Serial
     private static final long serialVersionUID = -5484709075767220358L;
 
     /** The entry trade */
@@ -131,6 +119,26 @@ public class Position implements Serializable {
     }
 
     /**
+     * Constructor for an open position.
+     *
+     * @param entry                the entry {@link Trade trade}
+     * @param transactionCostModel the cost model for transactions of the asset
+     * @param holdingCostModel     the cost model for holding asset (e.g. borrowing)
+     * @since 0.22.2
+     */
+    public Position(Trade entry, CostModel transactionCostModel, CostModel holdingCostModel) {
+        Objects.requireNonNull(entry, "entry");
+        if (!(entry.getCostModel().equals(transactionCostModel))) {
+            throw new IllegalArgumentException("Trades and the position must incorporate the same trading cost model");
+        }
+        this.startingType = entry.getType();
+        this.entry = entry;
+        this.exit = null;
+        this.transactionCostModel = transactionCostModel;
+        this.holdingCostModel = holdingCostModel;
+    }
+
+    /**
      * @return the entry {@link Trade trade} of the position
      */
     public Trade getEntry() {
@@ -144,10 +152,77 @@ public class Position implements Serializable {
         return exit;
     }
 
+    /**
+     * Returns the entry-side direction of this position.
+     *
+     * @return the entry side, or {@code null} when the position has no entry yet
+     * @since 0.22.4
+     */
+    public ExecutionSide side() {
+        if (entry == null) {
+            return null;
+        }
+        return entry.isBuy() ? ExecutionSide.BUY : ExecutionSide.SELL;
+    }
+
+    /**
+     * Returns the entry amount of this position.
+     *
+     * <p>
+     * For aggregated open positions this is the net open amount.
+     * </p>
+     *
+     * @return the entry amount, or {@code null} when the position has no entry yet
+     * @since 0.22.4
+     */
+    public Num amount() {
+        return entry == null ? null : entry.getAmount();
+    }
+
+    /**
+     * Returns the average entry price of this position.
+     *
+     * <p>
+     * For standard positions this is the entry trade price. For aggregated open
+     * positions this is the weighted average entry price of the net exposure.
+     * </p>
+     *
+     * @return the average entry price, or {@code null} when the position has no
+     *         entry yet
+     * @since 0.22.4
+     */
+    public Num averageEntryPrice() {
+        return entry == null ? null : entry.getPricePerAsset();
+    }
+
+    /**
+     * Returns the total entry cost of this position.
+     *
+     * @return the total entry cost, or {@code null} when the position has no entry
+     *         yet
+     * @since 0.22.4
+     */
+    public Num totalEntryCost() {
+        return entry == null ? null : entry.getValue();
+    }
+
+    /**
+     * Returns the entry fees currently carried by this position.
+     *
+     * <p>
+     * For aggregated open positions this reflects the summed remaining entry fees.
+     * </p>
+     *
+     * @return the entry fees, or {@code null} when the position has no entry yet
+     * @since 0.22.4
+     */
+    public Num totalFees() {
+        return entry == null ? null : entry.getCost();
+    }
+
     @Override
     public boolean equals(Object obj) {
-        if (obj instanceof Position) {
-            Position p = (Position) obj;
+        if (obj instanceof Position p) {
             return (entry == null ? p.getEntry() == null : entry.equals(p.getEntry()))
                     && (exit == null ? p.getExit() == null : exit.equals(p.getExit()));
         }
@@ -177,21 +252,55 @@ public class Position implements Serializable {
      * @param price  the price
      * @param amount the amount
      * @return the trade
-     * @throws IllegalStateException if {@link #isOpened()} and index < entry.index
+     * @throws IllegalStateException if {@link #isOpened()} and index {@literal <}
+     *                               entry.index
      */
     public Trade operate(int index, Num price, Num amount) {
+        CostModel effectiveTransactionCostModel = getTransactionCostModel();
         Trade trade = null;
         if (isNew()) {
-            trade = new Trade(index, startingType, price, amount, transactionCostModel);
-            entry = trade;
+            trade = operate(new BaseTrade(index, startingType, price, amount, effectiveTransactionCostModel));
         } else if (isOpened()) {
             if (index < entry.getIndex()) {
                 throw new IllegalStateException("The index i is less than the entryTrade index");
             }
-            trade = new Trade(index, startingType.complementType(), price, amount, transactionCostModel);
-            exit = trade;
+            trade = operate(
+                    new BaseTrade(index, startingType.complementType(), price, amount, effectiveTransactionCostModel));
         }
         return trade;
+    }
+
+    /**
+     * Operates the position with a pre-built trade.
+     *
+     * @param trade the trade to apply
+     * @return the trade
+     * @since 0.22.4
+     */
+    public Trade operate(Trade trade) {
+        Objects.requireNonNull(trade, "trade");
+        CostModel effectiveTransactionCostModel = getTransactionCostModel();
+        if (!trade.getCostModel().equals(effectiveTransactionCostModel)) {
+            throw new IllegalArgumentException("Trades and the position must incorporate the same trading cost model");
+        }
+        if (isNew()) {
+            if (trade.getType() != startingType) {
+                throw new IllegalArgumentException("The first trade type must match the starting type");
+            }
+            entry = trade;
+            return trade;
+        }
+        if (isOpened()) {
+            if (trade.getType() != startingType.complementType()) {
+                throw new IllegalArgumentException("The exit trade type must complement the entry trade type");
+            }
+            if (trade.getIndex() < entry.getIndex()) {
+                throw new IllegalStateException("The index i is less than the entryTrade index");
+            }
+            exit = trade;
+            return trade;
+        }
+        return null;
     }
 
     /**
@@ -223,7 +332,7 @@ public class Position implements Serializable {
     }
 
     /**
-     * @return true if position is closed and {@link #getProfit()} < 0
+     * @return true if position is closed and {@link #getProfit()} {@literal <} 0
      */
     public boolean hasLoss() {
         return getProfit().isNegative();
@@ -407,6 +516,26 @@ public class Position implements Serializable {
      */
     public Num getHoldingCost(int finalIndex) {
         return holdingCostModel.calculate(this, finalIndex);
+    }
+
+    /**
+     * @return the transaction cost model, or a zero-cost model after
+     *         deserialization when the model is unset
+     *
+     * @since 0.22.2
+     */
+    public CostModel getTransactionCostModel() {
+        return transactionCostModel == null ? new ZeroCostModel() : transactionCostModel;
+    }
+
+    /**
+     * @return the holding cost model, or a zero-cost model after deserialization
+     *         when the model is unset
+     *
+     * @since 0.22.2
+     */
+    public CostModel getHoldingCostModel() {
+        return holdingCostModel == null ? new ZeroCostModel() : holdingCostModel;
     }
 
     /**

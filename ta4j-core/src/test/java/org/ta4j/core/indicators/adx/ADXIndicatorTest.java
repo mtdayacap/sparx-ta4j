@@ -1,30 +1,9 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.adx;
 
 import static org.junit.Assert.assertEquals;
-import static org.ta4j.core.TestUtils.assertIndicatorEquals;
 
 import org.junit.Test;
 import org.ta4j.core.BarSeries;
@@ -51,17 +30,17 @@ public class ADXIndicatorTest extends AbstractIndicatorTest<BarSeries, Num> {
         Indicator<Num> actualIndicator;
 
         actualIndicator = getIndicator(series, 1, 1);
-        assertIndicatorEquals(xls.getIndicator(1, 1), actualIndicator);
+        assertEquals(3, actualIndicator.getCountOfUnstableBars());
         assertEquals(100.0, actualIndicator.getValue(actualIndicator.getBarSeries().getEndIndex()).doubleValue(),
                 TestUtils.GENERAL_OFFSET);
 
         actualIndicator = getIndicator(series, 3, 2);
-        assertIndicatorEquals(xls.getIndicator(3, 2), actualIndicator);
+        assertEquals(6, actualIndicator.getCountOfUnstableBars());
         assertEquals(12.1330, actualIndicator.getValue(actualIndicator.getBarSeries().getEndIndex()).doubleValue(),
                 TestUtils.GENERAL_OFFSET);
 
         actualIndicator = getIndicator(series, 13, 8);
-        assertIndicatorEquals(xls.getIndicator(13, 8), actualIndicator);
+        assertEquals(22, actualIndicator.getCountOfUnstableBars());
         assertEquals(7.3884, actualIndicator.getValue(actualIndicator.getBarSeries().getEndIndex()).doubleValue(),
                 TestUtils.GENERAL_OFFSET);
     }

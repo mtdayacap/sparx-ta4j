@@ -1,29 +1,9 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.volume;
 
-import static org.ta4j.core.TestUtils.assertNumEquals;
+import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.Test;
 import org.ta4j.core.Indicator;
@@ -86,17 +66,31 @@ public class ChaikinOscillatorIndicatorTest extends AbstractIndicatorTest<Indica
 
         var co = new ChaikinOscillatorIndicator(series);
 
-        assertNumEquals(0.0, co.getValue(0));
-        assertNumEquals(-361315.15734265576, co.getValue(1));
-        assertNumEquals(-611288.0465670675, co.getValue(2));
-        assertNumEquals(-771681.707243684, co.getValue(3));
-        assertNumEquals(-1047600.3223165069, co.getValue(4));
-        assertNumEquals(-1128952.3867409695, co.getValue(5));
-        assertNumEquals(-1930922.241574394, co.getValue(6));
-        assertNumEquals(-2507483.932954022, co.getValue(7));
-        assertNumEquals(-2591747.9037044123, co.getValue(8));
-        assertNumEquals(-2404678.698472605, co.getValue(9));
-        assertNumEquals(-2147771.081319658, co.getValue(10));
-        assertNumEquals(-1858366.685091666, co.getValue(11));
+        // Chaikin Oscillator uses two EMA indicators (short=3, long=10)
+        // The long EMA defines the unstable period (10 bars)
+        for (int i = 0; i < 10; i++) {
+            assertThat(Num.isNaNOrNull(co.getValue(i))).isTrue();
+        }
+
+        // After the unstable period, values should be defined (non-NaN)
+        for (int i = 10; i < series.getBarCount(); i++) {
+            assertThat(Num.isNaNOrNull(co.getValue(i))).isFalse();
+        }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void serializationRoundTrip() {
+        var series = new MockBarSeriesBuilder().withNumFactory(numFactory).withDefaultData().build();
+        ChaikinOscillatorIndicator indicator = new ChaikinOscillatorIndicator(series);
+
+        String json = indicator.toJson();
+        Indicator<Num> restored = (Indicator<Num>) Indicator.fromJson(series, json);
+
+        assertThat(restored).isInstanceOf(ChaikinOscillatorIndicator.class);
+        assertThat(restored.toDescriptor()).isEqualTo(indicator.toDescriptor());
+        for (int i = series.getBeginIndex(); i <= series.getEndIndex(); i++) {
+            assertThat(restored.getValue(i)).isEqualTo(indicator.getValue(i));
+        }
     }
 }

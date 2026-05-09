@@ -1,29 +1,10 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.rules;
 
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 
 import java.time.Instant;
@@ -79,5 +60,52 @@ public class TimeRangeRuleTest extends AbstractIndicatorTest<Object, Object> {
         assertTrue(rule.isSatisfied(8, null));
         assertTrue(rule.isSatisfied(9, null));
         assertFalse(rule.isSatisfied(10, null));
+    }
+
+    @Test
+    public void serializeAndDeserialize() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        series.barBuilder().endTime(Instant.parse("2019-09-17T02:00:00Z")).add();
+        series.barBuilder().endTime(Instant.parse("2019-09-17T18:00:00Z")).add();
+        var dateTimeIndicator = new DateTimeIndicator(series, Bar::getBeginTime);
+        var range = new TimeRangeRule.TimeRange(LocalTime.of(1, 0), LocalTime.of(3, 0));
+        TimeRangeRule rule = new TimeRangeRule(List.of(range), dateTimeIndicator);
+        RuleSerializationRoundTripTestSupport.assertRuleRoundTrips(series, rule);
+        RuleSerializationRoundTripTestSupport.assertRuleJsonRoundTrips(series, rule);
+    }
+
+    @Test
+    public void constructorWithSecondArraysEvaluatesRanges() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        series.barBuilder().endTime(Instant.parse("2019-09-17T02:30:00Z")).add();
+        series.barBuilder().endTime(Instant.parse("2019-09-17T18:15:00Z")).add();
+        var dateTimeIndicator = new DateTimeIndicator(series, Bar::getBeginTime);
+        int[] from = { LocalTime.of(2, 0).toSecondOfDay(), LocalTime.of(18, 0).toSecondOfDay() };
+        int[] to = { LocalTime.of(3, 0).toSecondOfDay(), LocalTime.of(19, 0).toSecondOfDay() };
+
+        TimeRangeRule rule = new TimeRangeRule(dateTimeIndicator, from, to);
+
+        assertTrue("02:30 should be inside first range", rule.isSatisfied(0, null));
+        assertTrue("18:15 should be inside second range", rule.isSatisfied(1, null));
+    }
+
+    @Test
+    public void constructorWithSecondArraysValidatesLengths() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        var dateTimeIndicator = new DateTimeIndicator(series, Bar::getBeginTime);
+        int[] from = { LocalTime.of(2, 0).toSecondOfDay() };
+        int[] to = { LocalTime.of(3, 0).toSecondOfDay(), LocalTime.of(4, 0).toSecondOfDay() };
+
+        assertThrows(IllegalArgumentException.class, () -> new TimeRangeRule(dateTimeIndicator, from, to));
+    }
+
+    @Test
+    public void constructorWithSecondArraysValidatesBounds() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        var dateTimeIndicator = new DateTimeIndicator(series, Bar::getBeginTime);
+        int[] from = { -1 };
+        int[] to = { LocalTime.of(1, 0).toSecondOfDay() };
+
+        assertThrows(IllegalArgumentException.class, () -> new TimeRangeRule(dateTimeIndicator, from, to));
     }
 }

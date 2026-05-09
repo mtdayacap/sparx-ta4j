@@ -1,41 +1,26 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.helpers;
-
-import java.util.function.BinaryOperator;
-import java.util.function.Function;
 
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.CachedIndicator;
 import org.ta4j.core.num.Num;
+
+import java.util.function.BinaryOperator;
+import java.util.function.Function;
 
 /**
  * Combine indicator.
  *
  * <p>
  * Combines two Num indicators by using common math operations.
+ *
+ * @deprecated Migrate usage to equivalent functions in
+ *             BinaryOperationIndicator. This class will be deleted in an
+ *             upcoming release
  */
+@Deprecated
 public class CombineIndicator extends CachedIndicator<Num> {
 
     private final Indicator<Num> indicatorLeft;
@@ -51,6 +36,7 @@ public class CombineIndicator extends CachedIndicator<Num> {
      * @param combination    a {@link Function} describing the combination function
      *                       to combine the values of the indicators
      */
+    @Deprecated
     public CombineIndicator(Indicator<Num> indicatorLeft, Indicator<Num> indicatorRight,
             BinaryOperator<Num> combination) {
         // TODO check both indicators use the same series/num function
@@ -61,19 +47,22 @@ public class CombineIndicator extends CachedIndicator<Num> {
     }
 
     @Override
+    @Deprecated
     protected Num calculate(int index) {
         return combineFunction.apply(indicatorLeft.getValue(index), indicatorRight.getValue(index));
     }
 
     /** @return {@code 0} */
     @Override
+    @Deprecated
     public int getCountOfUnstableBars() {
-        return 0;
+        return Math.max(indicatorLeft.getCountOfUnstableBars(), indicatorRight.getCountOfUnstableBars());
     }
 
     /**
      * Combines the two input indicators by indicatorLeft.plus(indicatorRight).
      */
+    @Deprecated
     public static CombineIndicator plus(Indicator<Num> indicatorLeft, Indicator<Num> indicatorRight) {
         return new CombineIndicator(indicatorLeft, indicatorRight, Num::plus);
     }
@@ -81,6 +70,7 @@ public class CombineIndicator extends CachedIndicator<Num> {
     /**
      * Combines the two input indicators by indicatorLeft.minus(indicatorRight).
      */
+    @Deprecated
     public static CombineIndicator minus(Indicator<Num> indicatorLeft, Indicator<Num> indicatorRight) {
         return new CombineIndicator(indicatorLeft, indicatorRight, Num::minus);
     }
@@ -88,6 +78,7 @@ public class CombineIndicator extends CachedIndicator<Num> {
     /**
      * Combines the two input indicators by indicatorLeft.dividedBy(indicatorRight).
      */
+    @Deprecated
     public static CombineIndicator divide(Indicator<Num> indicatorLeft, Indicator<Num> indicatorRight) {
         return new CombineIndicator(indicatorLeft, indicatorRight, Num::dividedBy);
     }
@@ -96,6 +87,7 @@ public class CombineIndicator extends CachedIndicator<Num> {
      * Combines the two input indicators by
      * indicatorLeft.multipliedBy(indicatorRight).
      */
+    @Deprecated
     public static CombineIndicator multiply(Indicator<Num> indicatorLeft, Indicator<Num> indicatorRight) {
         return new CombineIndicator(indicatorLeft, indicatorRight, Num::multipliedBy);
     }
@@ -103,6 +95,7 @@ public class CombineIndicator extends CachedIndicator<Num> {
     /**
      * Combines the two input indicators by indicatorLeft.max(indicatorRight).
      */
+    @Deprecated
     public static CombineIndicator max(Indicator<Num> indicatorLeft, Indicator<Num> indicatorRight) {
         return new CombineIndicator(indicatorLeft, indicatorRight, Num::max);
     }
@@ -110,11 +103,13 @@ public class CombineIndicator extends CachedIndicator<Num> {
     /**
      * Combines the two input indicators by indicatorLeft.min(indicatorRight).
      */
+    @Deprecated
     public static CombineIndicator min(Indicator<Num> indicatorLeft, Indicator<Num> indicatorRight) {
         return new CombineIndicator(indicatorLeft, indicatorRight, Num::min);
     }
 
     @Override
+    @Deprecated
     public String toString() {
         return getClass().getSimpleName();
     }

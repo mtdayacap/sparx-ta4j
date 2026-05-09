@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.num;
 
@@ -339,6 +319,60 @@ public class NumTest extends AbstractIndicatorTest<Object, Num> {
                 assertEquals(deserialized.doubleValue(), o.doubleValue());
             }
 
+        }
+    }
+
+    @Test
+    public void testIsNaNOrNull() {
+        // Test null value
+        assertTrue("null value should return true", Num.isNaNOrNull(null));
+
+        // Test NaN instance
+        assertTrue("NaN instance should return true", Num.isNaNOrNull(NaN));
+
+        // Test DoubleNum with Double.NaN (edge case - DoubleNum doesn't override
+        // isNaN())
+        // This should work regardless of which factory is being used for the test
+        final Num doubleNaN = DoubleNum.valueOf(Double.NaN);
+        assertTrue("DoubleNum with Double.NaN should return true", Num.isNaNOrNull(doubleNaN));
+
+        // Test valid DecimalNum values
+        final Num validDecimal = DecimalNum.valueOf(42.5);
+        assertFalse("Valid DecimalNum should return false", Num.isNaNOrNull(validDecimal));
+
+        // Test valid DoubleNum values
+        final Num validDouble = DoubleNum.valueOf(42.5);
+        assertFalse("Valid DoubleNum should return false", Num.isNaNOrNull(validDouble));
+
+        // Test zero values
+        final Num zero = numOf(0);
+        assertFalse("Zero value should return false", Num.isNaNOrNull(zero));
+
+        // Test negative values
+        final Num negative = numOf(-10.5);
+        assertFalse("Negative value should return false", Num.isNaNOrNull(negative));
+
+        // Test positive values
+        final Num positive = numOf(100.25);
+        assertFalse("Positive value should return false", Num.isNaNOrNull(positive));
+
+        // Test very small values
+        final Num small = numOf(0.0001);
+        assertFalse("Small value should return false", Num.isNaNOrNull(small));
+
+        // Test very large values
+        final Num large = numOf(1e10);
+        assertFalse("Large value should return false", Num.isNaNOrNull(large));
+
+        // Test infinity (if supported by the factory)
+        if (this.numFactory instanceof DoubleNumFactory) {
+            final Num positiveInfinity = DoubleNum.valueOf(Double.POSITIVE_INFINITY);
+            // Double.POSITIVE_INFINITY is not NaN, so should return false
+            assertFalse("Positive infinity should return false", Num.isNaNOrNull(positiveInfinity));
+
+            final Num negativeInfinity = DoubleNum.valueOf(Double.NEGATIVE_INFINITY);
+            // Double.NEGATIVE_INFINITY is not NaN, so should return false
+            assertFalse("Negative infinity should return false", Num.isNaNOrNull(negativeInfinity));
         }
     }
 

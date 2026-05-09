@@ -1,29 +1,10 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.num;
 
-import static org.ta4j.core.num.NaN.NaN;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.MathContext;
@@ -32,9 +13,9 @@ import java.text.DecimalFormat;
 import java.text.ParseException;
 import java.util.Locale;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import static org.ta4j.core.num.NaN.NaN;
 
 /**
  * Representation of arbitrary precision {@link BigDecimal}. A {@code Num}
@@ -51,11 +32,12 @@ import org.slf4j.LoggerFactory;
  */
 public final class DecimalNum implements Num {
 
+    static final int DEFAULT_PRECISION = 16;
     private static final long serialVersionUID = 1L;
     private static final Logger log = LoggerFactory.getLogger(DecimalNum.class);
-
-    static final int DEFAULT_PRECISION = 32;
-    private static final MathContext DEFAULT_MATH_CONTEXT = new MathContext(DEFAULT_PRECISION, RoundingMode.HALF_UP);
+    private static final RoundingMode DEFAULT_ROUNDING_MODE = RoundingMode.HALF_UP;
+    private static final AtomicReference<MathContext> DEFAULT_MATH_CONTEXT = new AtomicReference<>(
+            new MathContext(DEFAULT_PRECISION, DEFAULT_ROUNDING_MODE));
 
     private final MathContext mathContext;
     private final BigDecimal delegate;
@@ -69,7 +51,6 @@ public final class DecimalNum implements Num {
      * only a string parameter can accurately represent a value.
      *
      * @param val the string representation of the Num value
-     *
      * @deprecated This constructor leaks higher precisions into overall
      *             calculations. Use {@link DecimalNum(String, MathContext)}
      *             instead. {@link DecimalNumFactory#numOf(String)} does.
@@ -77,9 +58,11 @@ public final class DecimalNum implements Num {
     @Deprecated(since = "0.18", forRemoval = true)
     private DecimalNum(final String val) {
         this.delegate = new BigDecimal(val);
-        final int precision = Math.max(this.delegate.precision(), DEFAULT_PRECISION);
-        this.mathContext = precision == DEFAULT_PRECISION ? DEFAULT_MATH_CONTEXT
-                : new MathContext(precision, RoundingMode.HALF_UP);
+        final var defaultContext = getDefaultMathContext();
+        final int defaultPrecision = defaultContext.getPrecision();
+        final int precision = Math.max(this.delegate.precision(), defaultPrecision);
+        this.mathContext = precision == defaultPrecision ? defaultContext
+                : new MathContext(precision, defaultContext.getRoundingMode());
     }
 
     /**
@@ -98,11 +81,6 @@ public final class DecimalNum implements Num {
         this.delegate = new BigDecimal(val, mathContext);
     }
 
-    private DecimalNum(final short val, final MathContext mathContext) {
-        this.mathContext = mathContext;
-        this.delegate = new BigDecimal(val, mathContext);
-    }
-
     private DecimalNum(final int val, final MathContext mathContext) {
         this.mathContext = mathContext;
         this.delegate = BigDecimal.valueOf(val);
@@ -111,6 +89,11 @@ public final class DecimalNum implements Num {
     private DecimalNum(final long val, final MathContext mathContext) {
         this.mathContext = mathContext;
         this.delegate = BigDecimal.valueOf(val);
+    }
+
+    private DecimalNum(final short val, final MathContext mathContext) {
+        this.mathContext = mathContext;
+        this.delegate = new BigDecimal(val, mathContext);
     }
 
     private DecimalNum(final float val, final MathContext mathContext) {
@@ -198,6 +181,61 @@ public final class DecimalNum implements Num {
     }
 
     /**
+     * Returns the default {@link MathContext} used when no precision is specified.
+     *
+     * @return default math context
+     */
+    public static MathContext getDefaultMathContext() {
+        return DEFAULT_MATH_CONTEXT.get();
+    }
+
+    /**
+     * Returns the default precision used when no precision is specified.
+     *
+     * @return default precision
+     */
+    public static int getDefaultPrecision() {
+        return getDefaultMathContext().getPrecision();
+    }
+
+    /**
+     * Configures the default {@link MathContext} used by {@link DecimalNum}.
+     *
+     * @param mathContext new default math context
+     * @throws NullPointerException     if {@code mathContext} is {@code null}
+     * @throws IllegalArgumentException if {@code mathContext#getPrecision()} is not
+     *                                  positive
+     * @since 0.19
+     */
+    public static void configureDefaultMathContext(final MathContext mathContext) {
+        Objects.requireNonNull(mathContext, "mathContext");
+        if (mathContext.getPrecision() <= 0) {
+            throw new IllegalArgumentException("Precision must be greater than zero");
+        }
+        DEFAULT_MATH_CONTEXT.set(mathContext);
+    }
+
+    /**
+     * Configures the default precision while preserving the current rounding mode.
+     *
+     * @param precision new default precision (> 0)
+     * @since 0.19
+     */
+    public static void configureDefaultPrecision(final int precision) {
+        final var current = getDefaultMathContext();
+        configureDefaultMathContext(new MathContext(precision, current.getRoundingMode()));
+    }
+
+    /**
+     * Resets the default precision and rounding mode to the library defaults.
+     *
+     * @since 0.19
+     */
+    public static void resetDefaultPrecision() {
+        DEFAULT_MATH_CONTEXT.set(new MathContext(DEFAULT_PRECISION, DEFAULT_ROUNDING_MODE));
+    }
+
+    /**
      * Returns a {@code Num} version of the given {@code int}.
      *
      * @param val the number
@@ -278,13 +316,12 @@ public final class DecimalNum implements Num {
     /**
      * If there are operations between constant that have precision 0 and other
      * number we need to preserve bigger precision.
-     *
+     * <p>
      * If we do not provide math context that sets upper bound, BigDecimal chooses
      * "infinity" precision, that may be too much.
      *
      * @param first  decimal num
      * @param second decimal num
-     *
      * @return math context with bigger precision
      */
     private static MathContext chooseMathContextWithGreaterPrecision(final DecimalNum first, final DecimalNum second) {
@@ -538,6 +575,26 @@ public final class DecimalNum implements Num {
     }
 
     @Override
+    public Num exp() {
+        BigDecimal term = BigDecimal.ONE;
+        BigDecimal sum = BigDecimal.ONE;
+        final BigDecimal exponent = this.delegate;
+
+        int i = 1;
+        while (term.signum() != 0) {
+            term = term.multiply(exponent, this.mathContext).divide(BigDecimal.valueOf(i), this.mathContext);
+            final BigDecimal next = sum.add(term, this.mathContext);
+            if (next.compareTo(sum) == 0) {
+                break;
+            }
+            sum = next;
+            i++;
+        }
+
+        return DecimalNum.valueOf(sum, this.mathContext);
+    }
+
+    @Override
     public Num abs() {
         return new DecimalNum(this.delegate.abs(), this.mathContext);
     }
@@ -638,11 +695,6 @@ public final class DecimalNum implements Num {
         return !other.isNaN() && this.delegate.compareTo(((DecimalNum) other).delegate) < 1;
     }
 
-    @Override
-    public int compareTo(final Num other) {
-        return other.isNaN() ? 0 : this.delegate.compareTo(((DecimalNum) other).delegate);
-    }
-
     /**
      * @return the {@code Num} whose value is the smaller of this {@code Num} and
      *         {@code other}. If they are equal, as defined by the
@@ -685,10 +737,20 @@ public final class DecimalNum implements Num {
     }
 
     @Override
+    public int compareTo(final Num other) {
+        return other.isNaN() ? 0 : this.delegate.compareTo(((DecimalNum) other).delegate);
+    }
+
+    @Override
     public String toString() {
         return this.delegate.toString();
     }
 
+    /***
+     * TODO: DecimalNum throws NumberFormatException when Math.pow returns
+     * NaN/Infinity This is also an edge case behavior that should be documented or
+     * handled properly.
+     */
     @Override
     public Num pow(final Num n) {
         // There is no BigDecimal.pow(BigDecimal). We could do:

@@ -1,29 +1,11 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.num;
 
-public interface NumFactory {
+import java.io.Serializable;
+
+public interface NumFactory extends Serializable {
 
     /**
      * @return the Num of -1
@@ -59,6 +41,21 @@ public interface NumFactory {
      * @return the Num of 100
      */
     Num thousand();
+
+    /**
+     * Returns a small positive epsilon suitable for numerical guardrails and
+     * open-interval clamping.
+     *
+     * <p>
+     * The default implementation resolves to {@code 1e-12} in the current factory
+     * precision.
+     *
+     * @return epsilon value in this factory
+     * @since 0.22.4
+     */
+    default Num epsilon() {
+        return one().dividedBy(thousand().pow(4));
+    }
 
     /**
      * Transforms a {@link Number} into the {@link Num implementation} used by this

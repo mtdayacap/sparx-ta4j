@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.num;
 
@@ -131,6 +111,13 @@ public interface Num extends Comparable<Num>, Serializable {
      * @return {@code log(this)}
      */
     Num log();
+
+    /**
+     * Returns a {@code Num} whose value is {@code e^this}.
+     *
+     * @return {@code e^this}
+     */
+    Num exp();
 
     /**
      * Returns a {@code Num} whose value is {@code √(this)}.
@@ -300,6 +287,44 @@ public interface Num extends Comparable<Num>, Serializable {
      */
     default double doubleValue() {
         return getDelegate().doubleValue();
+    }
+
+    /**
+     * Checks if a Num value is null or NaN.
+     *
+     * <p>
+     * This method performs comprehensive NaN detection by checking:
+     * <ul>
+     * <li>If the value is null</li>
+     * <li>If {@link Num#isNaN()} returns true</li>
+     * <li>If the underlying double value is {@link Double#NaN} (handles DoubleNum
+     * edge cases)</li>
+     * </ul>
+     *
+     * <p>
+     * This is necessary because {@link DoubleNumFactory} can surface
+     * {@link Double#NaN} values that may not satisfy {@link Num#isNaN()}.
+     *
+     * @param value the value to check, may be null
+     * @return true if the value is null or NaN, false otherwise
+     */
+    static boolean isNaNOrNull(Num value) {
+        return value == null || value.isNaN() || Double.isNaN(value.doubleValue());
+    }
+
+    /**
+     * Checks if a Num value is valid (not null and not NaN).
+     *
+     * <p>
+     * This is the logical complement of {@link #isNaNOrNull(Num)}. A value is
+     * considered valid if it is non-null and represents a real number (not NaN).
+     *
+     * @param value the value to check, may be null
+     * @return true if the value is non-null and not NaN, false otherwise
+     * @since 0.22.0
+     */
+    static boolean isValid(Num value) {
+        return !isNaNOrNull(value);
     }
 
     /**

@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core;
 
@@ -42,6 +22,12 @@ import org.ta4j.core.num.NumFactory;
  * backtesting cases)
  * <li>limited to a fixed number of bars (e.g. for actual trading)
  * </ul>
+ *
+ * <p>
+ * The bar series is the core underlying dataset in ta4j. It represents a
+ * timeline of financial data (OHLCV) and acts as the source of truth for
+ * indicators, backtesting runs, and live trading operations.
+ * </p>
  */
 public interface BarSeries extends Serializable {
 
@@ -165,7 +151,7 @@ public interface BarSeries extends Serializable {
 
     /**
      * Sets the maximum number of bars that will be retained in the series.
-     *
+     * <p>
      * If a new bar is added to the series such that the number of bars will exceed
      * the maximum bar count, then the FIRST bar in the series is automatically
      * removed, ensuring that the maximum bar count is not exceeded. The indices of
@@ -259,15 +245,16 @@ public interface BarSeries extends Serializable {
      * between {@code startIndex} (inclusive) and {@code endIndex} (exclusive) of
      * {@code this} instance. The indices of {@code this} and its subseries can be
      * different, i. e. index 0 of the subseries will be the {@code startIndex} of
-     * {@code this}. If {@code startIndex} < this.seriesBeginIndex, then the
-     * subseries will start with the first available bar of {@code this}. If
-     * {@code endIndex} > this.seriesEndIndex, then the subseries will end at the
-     * last available bar of {@code this}.
+     * {@code this}. If {@code startIndex} {@literal <} this.seriesBeginIndex, then
+     * the subseries will start with the first available bar of {@code this}. If
+     * {@code endIndex} {@literal >} this.seriesEndIndex, then the subseries will
+     * end at the last available bar of {@code this}.
      *
      * @param startIndex the startIndex (inclusive)
      * @param endIndex   the endIndex (exclusive)
      * @return a new BarSeries with Bars from startIndex to endIndex-1
-     * @throws IllegalArgumentException if endIndex <= startIndex or startIndex < 0
+     * @throws IllegalArgumentException if endIndex {@literal <=} startIndex or
+     *                                  startIndex {@literal <} 0
      */
     BarSeries getSubSeries(int startIndex, int endIndex);
 

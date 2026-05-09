@@ -49,7 +49,7 @@ public class CompoundedAnnualGrowthReturnCriteriaTest extends AbstractCriterionT
         new MockBarSeriesBuilder().withNumFactory(numFactory).withBars(barSeries).build();
 
     TradingRecord tradingRecord =
-        new BaseTradingRecord(Trade.buyAt(0, series), Trade.buyAt(1, series));
+        new BaseTradingRecord(Trade.buyAt(0, series), Trade.sellAt(1, series));
     AnalysisCriterion criterion = getCriterion();
     Num cagr = criterion.calculate(series, tradingRecord).multipliedBy(DoubleNum.valueOf(100));
 

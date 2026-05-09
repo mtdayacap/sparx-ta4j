@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.helpers;
 
@@ -36,7 +16,30 @@ import org.ta4j.core.num.Num;
  * {@link #percentageThreshold threshold} was reached. If the threshold is
  * {@code 0} or not specified, only the percentage difference from the previous
  * value is returned.
+ *
+ * @deprecated Use {@link PercentageChangeIndicator} instead. This class has
+ *             been consolidated into {@code PercentageChangeIndicator} which
+ *             provides the same functionality with additional features.
+ *             <p>
+ *             Migration examples:
+ *             <ul>
+ *             <li>{@code new DifferencePercentageIndicator(indicator)} →
+ *             {@code new PercentageChangeIndicator(indicator)}</li>
+ *             <li>{@code new DifferencePercentageIndicator(indicator, threshold)}
+ *             → {@code new PercentageChangeIndicator(indicator, null,
+ *             threshold)}</li>
+ *             <li>{@code new DifferencePercentageIndicator(indicator,
+ *             previousIndicator)} → {@code new
+ *             PercentageChangeIndicator(indicator, previousIndicator)}</li>
+ *             <li>{@code new DifferencePercentageIndicator(indicator,
+ *             previousIndicator, threshold)} → {@code new
+ *             PercentageChangeIndicator(indicator, previousIndicator,
+ *             threshold)}</li>
+ *             </ul>
+ *
+ * @since 0.18
  */
+@Deprecated
 public class DifferencePercentageIndicator extends CachedIndicator<Num> {
 
     private final Indicator<Num> indicator;
@@ -48,6 +51,7 @@ public class DifferencePercentageIndicator extends CachedIndicator<Num> {
      *
      * @param indicator the {@link Indicator}
      */
+    @Deprecated
     public DifferencePercentageIndicator(Indicator<Num> indicator) {
         this(indicator, indicator.getBarSeries().numFactory().zero());
     }
@@ -58,6 +62,7 @@ public class DifferencePercentageIndicator extends CachedIndicator<Num> {
      * @param indicator           the {@link Indicator}
      * @param percentageThreshold the threshold percentage
      */
+    @Deprecated
     public DifferencePercentageIndicator(Indicator<Num> indicator, Number percentageThreshold) {
         this(indicator, indicator.getBarSeries().numFactory().numOf(percentageThreshold));
     }
@@ -68,6 +73,7 @@ public class DifferencePercentageIndicator extends CachedIndicator<Num> {
      * @param indicator           the {@link Indicator}
      * @param percentageThreshold the threshold percentage
      */
+    @Deprecated
     public DifferencePercentageIndicator(Indicator<Num> indicator, Num percentageThreshold) {
         super(indicator);
         this.indicator = indicator;
@@ -118,12 +124,13 @@ public class DifferencePercentageIndicator extends CachedIndicator<Num> {
     }
 
     @Override
+    @Deprecated
     public int getCountOfUnstableBars() {
-        return 1;
+        return indicator.getCountOfUnstableBars() + 1;
     }
 
     private Num fractionToPercentage(Num changeFraction) {
-        final var hundred = getBarSeries().numFactory().hundred();
+        final Num hundred = getBarSeries().numFactory().hundred();
         return changeFraction.multipliedBy(hundred).minus(hundred);
     }
 }

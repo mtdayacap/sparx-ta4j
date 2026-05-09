@@ -4,21 +4,21 @@ import java.time.ZoneId;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Position;
 import org.ta4j.core.TradingRecord;
-import org.ta4j.core.criteria.pnl.ReturnCriterion;
+import org.ta4j.core.criteria.pnl.GrossReturnCriterion;
 import org.ta4j.core.num.DoubleNum;
 import org.ta4j.core.num.Num;
 
 public class CompoundedAnnualGrowthReturnCriteria extends AbstractAnalysisCriterion {
   @Override
   public Num calculate(BarSeries series, Position position) {
-    Num grossReturn = new ReturnCriterion().calculate(series, position);
+    Num grossReturn = new GrossReturnCriterion().calculate(series, position);
     double cagr = calculateCagr(series, grossReturn);
     return DoubleNum.valueOf(cagr);
   }
 
   @Override
   public Num calculate(BarSeries series, TradingRecord tradingRecord) {
-    Num grossReturn = new ReturnCriterion().calculate(series, tradingRecord);
+    Num grossReturn = new GrossReturnCriterion().calculate(series, tradingRecord);
     Double cagr = calculateCagr(series, grossReturn);
     return DoubleNum.valueOf(cagr);
   }
