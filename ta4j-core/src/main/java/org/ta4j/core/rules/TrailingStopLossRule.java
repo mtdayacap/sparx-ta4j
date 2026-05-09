@@ -1,28 +1,9 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.rules;
 
+import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.Position;
 import org.ta4j.core.TradingRecord;
@@ -35,8 +16,11 @@ import org.ta4j.core.num.Num;
  *
  * <p>
  * Satisfied when the price reaches the trailing loss threshold.
+ *
+ * <p>
+ * This rule uses the {@code tradingRecord}.
  */
-public class TrailingStopLossRule extends AbstractRule {
+public class TrailingStopLossRule extends AbstractRule implements StopLossPriceModel {
 
     /** The price indicator. */
     private final Indicator<Num> priceIndicator;
@@ -96,9 +80,7 @@ public class TrailingStopLossRule extends AbstractRule {
         HighestValueIndicator highest = new HighestValueIndicator(priceIndicator,
                 getValueIndicatorBarCount(index, positionIndex));
         Num highestCloseNum = highest.getValue(index);
-        final var hundred = highestCloseNum.getNumFactory().hundred();
-        Num lossRatioThreshold = hundred.minus(lossPercentage).dividedBy(hundred);
-        Num currentStopLossLimitActivation = highestCloseNum.multipliedBy(lossRatioThreshold);
+        Num currentStopLossLimitActivation = StopLossRule.stopLossPrice(highestCloseNum, lossPercentage, true);
         return currentPrice.isLessThanOrEqual(currentStopLossLimitActivation);
     }
 
@@ -106,10 +88,33 @@ public class TrailingStopLossRule extends AbstractRule {
         LowestValueIndicator lowest = new LowestValueIndicator(priceIndicator,
                 getValueIndicatorBarCount(index, positionIndex));
         Num lowestCloseNum = lowest.getValue(index);
-        final var hundred = lowestCloseNum.getNumFactory().hundred();
-        Num lossRatioThreshold = hundred.plus(lossPercentage).dividedBy(hundred);
-        Num currentStopLossLimitActivation = lowestCloseNum.multipliedBy(lossRatioThreshold);
+        Num currentStopLossLimitActivation = StopLossRule.stopLossPrice(lowestCloseNum, lossPercentage, false);
         return currentPrice.isGreaterThanOrEqual(currentStopLossLimitActivation);
+    }
+
+    /**
+     * Returns the stop-loss price for the supplied position entry.
+     *
+     * @param series   the price series
+     * @param position the position being evaluated
+     * @return the stop-loss price, or {@code null} if unavailable
+     * @since 0.22.3
+     */
+    @Override
+    public Num stopPrice(BarSeries series, Position position) {
+        if (position == null || position.getEntry() == null) {
+            return null;
+        }
+        int entryIndex = position.getEntry().getIndex();
+        int barCount = getValueIndicatorBarCount(entryIndex, entryIndex);
+        if (position.getEntry().isBuy()) {
+            HighestValueIndicator highest = new HighestValueIndicator(priceIndicator, barCount);
+            Num highestCloseNum = highest.getValue(entryIndex);
+            return StopLossRule.stopLossPrice(highestCloseNum, lossPercentage, true);
+        }
+        LowestValueIndicator lowest = new LowestValueIndicator(priceIndicator, barCount);
+        Num lowestCloseNum = lowest.getValue(entryIndex);
+        return StopLossRule.stopLossPrice(lowestCloseNum, lossPercentage, false);
     }
 
     private int getValueIndicatorBarCount(int index, int positionIndex) {
@@ -119,7 +124,7 @@ public class TrailingStopLossRule extends AbstractRule {
     @Override
     protected void traceIsSatisfied(int index, boolean isSatisfied) {
         if (log.isTraceEnabled()) {
-            log.trace("{}#isSatisfied({}): {}. Current price: {}", getClass().getSimpleName(), index, isSatisfied,
+            log.trace("{}#isSatisfied({}): {}. Current price: {}", getTraceDisplayName(), index, isSatisfied,
                     priceIndicator.getValue(index));
         }
     }

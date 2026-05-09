@@ -1,37 +1,25 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.analysis;
 
-import static org.junit.Assert.assertEquals;
-import static org.ta4j.core.TestUtils.assertNumEquals;
-
+import java.time.Instant;
 import java.util.Collections;
-
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 import org.ta4j.core.BaseTradingRecord;
+import org.ta4j.core.BaseTrade;
+import org.ta4j.core.ExecutionMatchPolicy;
+import org.ta4j.core.ExecutionSide;
 import org.ta4j.core.Indicator;
+import org.ta4j.core.Position;
 import org.ta4j.core.Trade;
+import org.ta4j.core.Trade.TradeType;
+import org.ta4j.core.analysis.cost.CostModel;
+import org.ta4j.core.analysis.cost.FixedTransactionCostModel;
+import org.ta4j.core.analysis.cost.ZeroCostModel;
+import static org.ta4j.core.TestUtils.assertNumEquals;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
@@ -56,7 +44,6 @@ public class CashFlowTest extends AbstractIndicatorTest<Indicator<Num>, Num> {
         assertNumEquals(1, cashFlow.getValue(2));
         assertNumEquals(1, cashFlow.getValue(3));
         assertNumEquals(1, cashFlow.getValue(4));
-
     }
 
     @Test
@@ -68,6 +55,95 @@ public class CashFlowTest extends AbstractIndicatorTest<Indicator<Num>, Num> {
 
         assertNumEquals(1, cashFlow.getValue(0));
         assertNumEquals(2, cashFlow.getValue(1));
+    }
+
+    @Test
+    public void cashFlowRealizedKeepsEntryValueUntilExit() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1d, 2d, 3d).build();
+        var tradingRecord = new BaseTradingRecord(Trade.buyAt(0, sampleBarSeries), Trade.sellAt(2, sampleBarSeries));
+
+        var cashFlow = new CashFlow(sampleBarSeries, tradingRecord, EquityCurveMode.REALIZED);
+
+        assertNumEquals(1, cashFlow.getValue(0));
+        assertNumEquals(1, cashFlow.getValue(1));
+        assertNumEquals(3, cashFlow.getValue(2));
+    }
+
+    @Test
+    public void cashFlowRealizedIgnoresOpenPositions() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1d, 2d, 3d).build();
+        var tradingRecord = new BaseTradingRecord(Trade.buyAt(0, sampleBarSeries));
+
+        var cashFlow = new CashFlow(sampleBarSeries, tradingRecord, EquityCurveMode.REALIZED);
+
+        assertNumEquals(1, cashFlow.getValue(0));
+        assertNumEquals(1, cashFlow.getValue(1));
+        assertNumEquals(1, cashFlow.getValue(2));
+    }
+
+    @Test
+    public void cashFlowMarkToMarketOpenPositionRespectsFinalIndexAndPadsAfterwards() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1d, 2d, 3d).build();
+        var tradingRecord = new BaseTradingRecord(Trade.buyAt(0, sampleBarSeries));
+
+        var cashFlow = new CashFlow(sampleBarSeries, tradingRecord, 1, EquityCurveMode.MARK_TO_MARKET,
+                OpenPositionHandling.MARK_TO_MARKET);
+
+        assertNumEquals(1, cashFlow.getValue(0));
+        assertNumEquals(2, cashFlow.getValue(1));
+        assertNumEquals(2, cashFlow.getValue(2)); // padded with last computed value at finalIndex
+    }
+
+    @Test
+    public void cashFlowWindowedMarkToMarketSeedsWindowStartForOpenPosition() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory)
+                .withData(100d, 120d, 110d, 90d)
+                .build();
+        var tradingRecord = new BaseTradingRecord(Trade.buyAt(0, sampleBarSeries), Trade.sellAt(3, sampleBarSeries));
+
+        var cashFlow = new CashFlow(sampleBarSeries, tradingRecord, 1, 3, EquityCurveMode.MARK_TO_MARKET,
+                OpenPositionHandling.MARK_TO_MARKET);
+
+        assertNumEquals(1.2d, cashFlow.getValue(1));
+        assertNumEquals(1.1d, cashFlow.getValue(2));
+        assertNumEquals(0.9d, cashFlow.getValue(3));
+    }
+
+    @Test
+    public void cashFlowWindowedRealizedKeepsWindowStartFlatForOpenPosition() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(100d, 120d, 110d).build();
+        var tradingRecord = new BaseTradingRecord(Trade.buyAt(0, sampleBarSeries), Trade.sellAt(2, sampleBarSeries));
+
+        var cashFlow = new CashFlow(sampleBarSeries, tradingRecord, 1, 2, EquityCurveMode.REALIZED,
+                OpenPositionHandling.MARK_TO_MARKET);
+
+        assertNumEquals(1d, cashFlow.getValue(1));
+        assertNumEquals(1.1d, cashFlow.getValue(2));
+    }
+
+    @Test
+    public void cashFlowMarkToMarketCanIgnoreOpenPositions() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1d, 2d, 3d).build();
+        var tradingRecord = new BaseTradingRecord(Trade.buyAt(0, sampleBarSeries));
+
+        var cashFlow = new CashFlow(sampleBarSeries, tradingRecord, EquityCurveMode.MARK_TO_MARKET,
+                OpenPositionHandling.IGNORE);
+
+        assertNumEquals(1, cashFlow.getValue(0));
+        assertNumEquals(1, cashFlow.getValue(1));
+        assertNumEquals(1, cashFlow.getValue(2));
+    }
+
+    @Test
+    public void cashFlowMarkToMarketIncludesOpenPositionsByDefault() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1d, 2d, 3d).build();
+        var tradingRecord = new BaseTradingRecord(Trade.buyAt(0, sampleBarSeries));
+
+        var cashFlow = new CashFlow(sampleBarSeries, tradingRecord, EquityCurveMode.MARK_TO_MARKET);
+
+        assertNumEquals(1, cashFlow.getValue(0));
+        assertNumEquals(2, cashFlow.getValue(1));
+        assertNumEquals(3, cashFlow.getValue(2));
     }
 
     @Test
@@ -301,6 +377,26 @@ public class CashFlowTest extends AbstractIndicatorTest<Indicator<Num>, Num> {
     }
 
     @Test
+    public void cashFlowWithZeroCostsProducesConsistentValuesForCompressedSeries() {
+        double[] originalPrices = { 100, 105, 110, 115, 120 };
+        double[] compressedPrices = { 100, 110, 120 };
+
+        var originalSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(originalPrices).build();
+        var compressedSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(compressedPrices).build();
+
+        var originalRecord = new BaseTradingRecord(Trade.buyAt(0, originalSeries),
+                Trade.sellAt(originalSeries.getEndIndex(), originalSeries));
+        var compressedRecord = new BaseTradingRecord(Trade.buyAt(0, compressedSeries),
+                Trade.sellAt(compressedSeries.getEndIndex(), compressedSeries));
+
+        var originalCashFlow = new CashFlow(originalSeries, originalRecord);
+        var compressedCashFlow = new CashFlow(compressedSeries, compressedRecord);
+
+        assertNumEquals(originalCashFlow.getValue(2), compressedCashFlow.getValue(1));
+        assertNumEquals(originalCashFlow.getValue(4), compressedCashFlow.getValue(2));
+    }
+
+    @Test
     public void reallyLongCashFlow() {
         int size = 1000000;
         var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory)
@@ -310,6 +406,158 @@ public class CashFlowTest extends AbstractIndicatorTest<Indicator<Num>, Num> {
                 Trade.sellAt(size - 1, sampleBarSeries));
         var cashFlow = new CashFlow(sampleBarSeries, tradingRecord);
         assertNumEquals(1, cashFlow.getValue(size - 1));
+    }
+
+    @Test
+    public void cashFlowBuyExitSameBarShouldNotReturnNaN() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(100d, 100d).build();
+
+        var entryPrice = numFactory.hundred();
+        var exitPrice = numFactory.numOf(90);
+        var amount = numFactory.one();
+
+        var tradingRecord = new BaseTradingRecord(Trade.buyAt(0, entryPrice, amount),
+                Trade.sellAt(0, exitPrice, amount));
+
+        var cashFlow = new CashFlow(sampleBarSeries, tradingRecord);
+
+        assertNumEquals(1, cashFlow.getValue(0));
+        assertNumEquals(0.9, cashFlow.getValue(1));
+    }
+
+    @Test
+    public void cashFlowIgnoresOpenPositionWhenConfigured() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(100d, 120d, 180d).build();
+        var tradingRecord = new BaseTradingRecord(Trade.buyAt(0, sampleBarSeries), Trade.sellAt(1, sampleBarSeries),
+                Trade.buyAt(1, sampleBarSeries));
+
+        var markToMarket = new CashFlow(sampleBarSeries, tradingRecord, OpenPositionHandling.MARK_TO_MARKET);
+        var ignore = new CashFlow(sampleBarSeries, tradingRecord, OpenPositionHandling.IGNORE);
+
+        assertNumEquals(1.8, markToMarket.getValue(2));
+        assertNumEquals(1.2, ignore.getValue(2));
+    }
+
+    @Test
+    public void cashFlowFromPositionUsesMarkToMarketCurve() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1d, 2d, 3d).build();
+        var position = new Position(Trade.buyAt(0, sampleBarSeries), Trade.sellAt(2, sampleBarSeries));
+
+        var cashFlow = new CashFlow(sampleBarSeries, position);
+
+        assertNumEquals(1, cashFlow.getValue(0));
+        assertNumEquals(2, cashFlow.getValue(1));
+        assertNumEquals(3, cashFlow.getValue(2));
+    }
+
+    @Test
+    public void cashFlowFromPositionPreservesCostModels() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(100d, 100d, 100d).build();
+        var transactionCost = new FixedTransactionCostModel(1d);
+        var holdingCost = new FixedHoldingCostModel(4d);
+        var amount = numFactory.one();
+        var entry = Trade.buyAt(0, sampleBarSeries.getBar(0).getClosePrice(), amount, transactionCost);
+        var exit = Trade.sellAt(2, sampleBarSeries.getBar(2).getClosePrice(), amount, transactionCost);
+        var position = new Position(entry, exit, transactionCost, holdingCost);
+
+        var cashFlow = new CashFlow(sampleBarSeries, position);
+
+        assertNumEquals(1, cashFlow.getValue(0));
+        assertNumEquals(98d / 101d, cashFlow.getValue(1));
+        assertNumEquals(97d / 101d, cashFlow.getValue(2));
+    }
+
+    @Test
+    public void cashFlowFromPositionUsesRealizedCurve() {
+        var sampleBarSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1d, 2d, 3d).build();
+        var position = new Position(Trade.buyAt(0, sampleBarSeries), Trade.sellAt(2, sampleBarSeries));
+
+        var cashFlow = new CashFlow(sampleBarSeries, position, EquityCurveMode.REALIZED);
+
+        assertNumEquals(1, cashFlow.getValue(0));
+        assertNumEquals(1, cashFlow.getValue(1));
+        assertNumEquals(3, cashFlow.getValue(2));
+    }
+
+    @Test
+    public void cashFlowMarkToMarketDoesNotUseFutureExitPriceWhenExitAfterFinalIndex() {
+        var series = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(10d, 11d, 12d, 13d, 100d).build();
+        var tradingRecord = new BaseTradingRecord();
+        tradingRecord.enter(0, series.getBar(0).getClosePrice(), numFactory.one());
+        tradingRecord.exit(4, series.getBar(4).getClosePrice(), numFactory.one());
+
+        var cashFlow = new CashFlow(series, tradingRecord, 2, EquityCurveMode.MARK_TO_MARKET,
+                OpenPositionHandling.MARK_TO_MARKET);
+
+        var expected = series.getBar(2).getClosePrice().dividedBy(series.getBar(0).getClosePrice());
+        assertTrue(cashFlow.getValue(2).isEqual(expected));
+        assertNumEquals(expected, cashFlow.getValue(2));
+    }
+
+    @Test
+    public void cashFlowIgnoreSkipsPositionsThatAreOpenAtFinalIndex() {
+        var series = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(10d, 11d, 12d, 13d, 100d).build();
+        var tradingRecord = new BaseTradingRecord();
+        tradingRecord.enter(0, series.getBar(0).getClosePrice(), numFactory.one());
+        tradingRecord.exit(4, series.getBar(4).getClosePrice(), numFactory.one());
+
+        var cashFlow = new CashFlow(series, tradingRecord, 2, EquityCurveMode.MARK_TO_MARKET,
+                OpenPositionHandling.IGNORE);
+
+        assertNumEquals(series.numFactory().one(), cashFlow.getValue(2));
+    }
+
+    @Test
+    public void cashFlowIncludesMultipleOpenLotsFromBaseTradingRecord() {
+        var series = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(10d, 12d, 14d).build();
+        var record = new BaseTradingRecord(TradeType.BUY, ExecutionMatchPolicy.FIFO, new ZeroCostModel(),
+                new ZeroCostModel(), null, null);
+
+        record.recordFill(0, new BaseTrade(0, Instant.EPOCH, series.getBar(0).getClosePrice(), numFactory.one(), null,
+                ExecutionSide.BUY, null, null));
+        record.recordFill(1, new BaseTrade(1, Instant.EPOCH, series.getBar(1).getClosePrice(), numFactory.one(), null,
+                ExecutionSide.BUY, null, null));
+
+        var cashFlow = new CashFlow(series, record, EquityCurveMode.MARK_TO_MARKET,
+                OpenPositionHandling.MARK_TO_MARKET);
+
+        var expectedAt1 = series.getBar(1).getClosePrice().dividedBy(series.getBar(0).getClosePrice());
+        var ratioFirst = series.getBar(2).getClosePrice().dividedBy(series.getBar(0).getClosePrice());
+        var ratioSecond = series.getBar(2).getClosePrice().dividedBy(series.getBar(1).getClosePrice());
+        var expectedAt2 = ratioFirst.multipliedBy(ratioSecond);
+
+        assertNumEquals(expectedAt1, cashFlow.getValue(1));
+        assertNumEquals(expectedAt2, cashFlow.getValue(2));
+    }
+
+    private record FixedHoldingCostModel(double fee) implements CostModel {
+
+        @Override
+        public Num calculate(Position position, int finalIndex) {
+            return cost(position);
+        }
+
+        @Override
+        public Num calculate(Position position) {
+            return cost(position);
+        }
+
+        @Override
+        public Num calculate(Num price, Num amount) {
+            return price.getNumFactory().numOf(fee);
+        }
+
+        @Override
+        public boolean equals(CostModel otherModel) {
+            if (otherModel instanceof FixedHoldingCostModel(double fee1)) {
+                return fee1 == fee;
+            }
+            return false;
+        }
+
+        private Num cost(Position position) {
+            return position.getEntry().getPricePerAsset().getNumFactory().numOf(fee);
+        }
     }
 
 }

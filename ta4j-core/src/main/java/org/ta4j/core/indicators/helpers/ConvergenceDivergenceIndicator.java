@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.helpers;
 
@@ -134,6 +114,7 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
 
     /** The minimum slope for convergence or divergence. **/
     private final Num minSlope;
+    private final int unstableBars;
 
     /**
      * Constructor. <br/>
@@ -173,6 +154,7 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
         this.strictType = null;
         this.minStrength = getBarSeries().numFactory().numOf(Math.min(1, Math.abs(minStrength)));
         this.minSlope = getBarSeries().numFactory().numOf(minSlope);
+        this.unstableBars = computeUnstableBars(ref, other, barCount);
     }
 
     /**
@@ -206,6 +188,7 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
         this.strictType = strictType;
         this.minStrength = null;
         this.minSlope = null;
+        this.unstableBars = computeUnstableBars(ref, other, barCount);
     }
 
     @Override
@@ -251,7 +234,14 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
     /** @return {@link #barCount} */
     @Override
     public int getCountOfUnstableBars() {
-        return barCount;
+        return unstableBars;
+    }
+
+    private static int computeUnstableBars(Indicator<Num> ref, Indicator<Num> other, int barCount) {
+        int baseUnstable = Math.max(ref.getCountOfUnstableBars(), other.getCountOfUnstableBars());
+        int correlationUnstable = new CorrelationCoefficientIndicator(ref, other, barCount).getCountOfUnstableBars();
+        int slopeUnstable = new SimpleLinearRegressionIndicator(ref, barCount).getCountOfUnstableBars();
+        return Math.max(baseUnstable, Math.max(correlationUnstable, slopeUnstable));
     }
 
     /**
@@ -260,7 +250,7 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
      */
     private Boolean calculatePositiveConvergenceStrict(int index) {
         Rule refIsRising = new IsRisingRule(ref, barCount);
-        Rule otherIsRising = new IsRisingRule(ref, barCount);
+        Rule otherIsRising = new IsRisingRule(other, barCount);
 
         return (refIsRising.and(otherIsRising)).isSatisfied(index);
     }
@@ -271,7 +261,7 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
      */
     private Boolean calculateNegativeConvergenceStrict(int index) {
         Rule refIsFalling = new IsFallingRule(ref, barCount);
-        Rule otherIsFalling = new IsFallingRule(ref, barCount);
+        Rule otherIsFalling = new IsFallingRule(other, barCount);
 
         return (refIsFalling.and(otherIsFalling)).isSatisfied(index);
     }
@@ -282,7 +272,7 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
      */
     private Boolean calculatePositiveDivergenceStrict(int index) {
         Rule refIsRising = new IsRisingRule(ref, barCount);
-        Rule otherIsFalling = new IsFallingRule(ref, barCount);
+        Rule otherIsFalling = new IsFallingRule(other, barCount);
 
         return (refIsRising.and(otherIsFalling)).isSatisfied(index);
     }
@@ -293,7 +283,7 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
      */
     private Boolean calculateNegativeDivergenceStrict(int index) {
         Rule refIsFalling = new IsFallingRule(ref, barCount);
-        Rule otherIsRising = new IsRisingRule(ref, barCount);
+        Rule otherIsRising = new IsRisingRule(other, barCount);
 
         return (refIsFalling.and(otherIsRising)).isSatisfied(index);
     }
@@ -352,14 +342,14 @@ public class ConvergenceDivergenceIndicator extends CachedIndicator<Boolean> {
      */
     private Boolean calculateNegativeDivergence(int index) {
 
+        Num minusOne = getBarSeries().numFactory().minusOne();
         CorrelationCoefficientIndicator cc = new CorrelationCoefficientIndicator(ref, other, barCount);
-        boolean isDivergent = cc.getValue(index)
-                .isLessThanOrEqual(minStrength.multipliedBy(getBarSeries().numFactory().numOf(-1)));
+        boolean isDivergent = cc.getValue(index).isLessThanOrEqual(minStrength.multipliedBy(minusOne));
 
         if (isDivergent) {
             // If "isDivergent" and "ref" is positive, then "other" must be negative.
             Num slope = calculateSlopeRel(index);
-            return slope.isLessThanOrEqual(minSlope.abs().multipliedBy(getBarSeries().numFactory().numOf(-1)));
+            return slope.isLessThanOrEqual(minSlope.abs().multipliedBy(minusOne));
         }
 
         return false;

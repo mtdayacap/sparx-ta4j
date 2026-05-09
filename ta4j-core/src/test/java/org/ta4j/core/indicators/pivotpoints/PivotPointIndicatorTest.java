@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.pivotpoints;
 
@@ -36,16 +16,21 @@ import static org.ta4j.core.indicators.pivotpoints.TimeLevel.MONTH;
 import static org.ta4j.core.indicators.pivotpoints.TimeLevel.WEEK;
 import static org.ta4j.core.indicators.pivotpoints.TimeLevel.YEAR;
 import static org.ta4j.core.num.NaN.NaN;
+import static org.junit.Assert.assertFalse;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
-import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 
 import org.junit.Before;
 import org.junit.Test;
+import org.ta4j.core.Bar;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
+import org.ta4j.core.num.Num;
 
 public class PivotPointIndicatorTest {
 
@@ -606,11 +591,13 @@ public class PivotPointIndicatorTest {
                 2017-10-06,22:00:00,172.24,172.37,172.16,172.23,1062537,0
                 """;
 
-        var dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd H:m:s z");
+        var dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd H:m:s");
+        var zone = ZoneId.of("America/Los_Angeles");
         series5Minutes = new MockBarSeriesBuilder().withName("FB_5_minutes").build();
         rawData5Minutes.lines().forEach(aDataLine -> {
             var barData = aDataLine.split(",");
-            var date = ZonedDateTime.parse(barData[0] + " " + barData[1] + " PST", dtf).toInstant();
+            var local = LocalDateTime.parse(barData[0] + " " + barData[1], dtf);
+            var date = local.atZone(zone).toInstant();
             var open = Double.parseDouble(barData[2]);
             var high = Double.parseDouble(barData[3]);
             var low = Double.parseDouble(barData[4]);
@@ -807,11 +794,13 @@ public class PivotPointIndicatorTest {
                 2017-10-06,22:00:00,171.67,172.37,171.55,172.23,2317180,0
                 """;
 
-        var dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd H:m:s z");
+        var dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd H:m:s");
+        var zone = ZoneId.of("America/Los_Angeles");
         series1Hours = new MockBarSeriesBuilder().withName("FB_1_hours").build();
         rawData1Hours.lines().forEach(aDataLine -> {
             var barData = aDataLine.split(",");
-            var date = ZonedDateTime.parse(barData[0] + " " + barData[1] + " PST", dtf).toInstant();
+            var local = LocalDateTime.parse(barData[0] + " " + barData[1], dtf);
+            var date = local.atZone(zone).toInstant();
             double open = Double.parseDouble(barData[2]);
             double high = Double.parseDouble(barData[3]);
             double low = Double.parseDouble(barData[4]);
@@ -1333,53 +1322,60 @@ public class PivotPointIndicatorTest {
         var r3 = new StandardReversalIndicator(pp, RESISTANCE_3);
 
         // pp
-        assertEquals(pp.getValue(0), NaN);// first bar no data for calculation
+        assertEquals(NaN, pp.getValue(0));// first bar no data for calculation
         // result of calculation for 7-27 bar is not adequate because the previous day
-        // is incomplete..
-        assertNumEquals(Double.valueOf("170.91666666666666"), pp.getValue(170));
+        // is incomplete.
+        assertNumEquals(Double.parseDouble("170.91666666666666"), pp.getValue(170));
 
         // prev last bar
-        assertNumEquals(Double.valueOf("169.20666666666666666666666666667"),
+        assertNumEquals(Double.parseDouble("169.20666666666666666666666666667"),
                 pp.getValue(series5Minutes.getEndIndex() - 80));
 
         // last bar
-        assertNumEquals(Double.valueOf("170.07666666666666666666666666667"), pp.getValue(series5Minutes.getEndIndex()));
+        assertNumEquals(Double.parseDouble("170.07666666666666666666666666667"),
+                pp.getValue(series5Minutes.getEndIndex()));
 
         // s1
-        assertEquals(s1.getValue(0), NaN);
-        assertNumEquals(Double.valueOf("167.74333333333333333333333333334"),
+        assertEquals(NaN, s1.getValue(0));
+        assertNumEquals(Double.parseDouble("167.74333333333333333333333333334"),
                 s1.getValue(series5Minutes.getEndIndex() - 80));
-        assertNumEquals(Double.valueOf("168.84333333333333333333333333334"), s1.getValue(series5Minutes.getEndIndex()));
+        assertNumEquals(Double.parseDouble("168.84333333333333333333333333334"),
+                s1.getValue(series5Minutes.getEndIndex()));
 
         // s2
-        assertEquals(s2.getValue(0), NaN);
-        assertNumEquals(Double.valueOf("166.82666666666666666666666666667"),
+        assertEquals(NaN, s2.getValue(0));
+        assertNumEquals(Double.parseDouble("166.82666666666666666666666666667"),
                 s2.getValue(series5Minutes.getEndIndex() - 80));
-        assertNumEquals(Double.valueOf("167.36666666666666666666666666667"), s2.getValue(series5Minutes.getEndIndex()));
+        assertNumEquals(Double.parseDouble("167.36666666666666666666666666667"),
+                s2.getValue(series5Minutes.getEndIndex()));
 
         // s3
-        assertEquals(s3.getValue(0), NaN);
-        assertNumEquals(Double.valueOf("165.36333333333333333333333333334"),
+        assertEquals(NaN, s3.getValue(0));
+        assertNumEquals(Double.parseDouble("165.36333333333333333333333333334"),
                 s3.getValue(series5Minutes.getEndIndex() - 80));
-        assertNumEquals(Double.valueOf("166.13333333333333333333333333334"), s3.getValue(series5Minutes.getEndIndex()));
+        assertNumEquals(Double.parseDouble("166.13333333333333333333333333334"),
+                s3.getValue(series5Minutes.getEndIndex()));
 
         // r1
-        assertEquals(r1.getValue(0), NaN);
-        assertNumEquals(Double.valueOf("170.12333333333333333333333333334"),
+        assertEquals(NaN, r1.getValue(0));
+        assertNumEquals(Double.parseDouble("170.12333333333333333333333333334"),
                 r1.getValue(series5Minutes.getEndIndex() - 80));
-        assertNumEquals(Double.valueOf("171.55333333333333333333333333334"), r1.getValue(series5Minutes.getEndIndex()));
+        assertNumEquals(Double.parseDouble("171.55333333333333333333333333334"),
+                r1.getValue(series5Minutes.getEndIndex()));
 
         // r2
-        assertEquals(r2.getValue(0), NaN);
-        assertNumEquals(Double.valueOf("171.58666666666666666666666666667"),
+        assertEquals(NaN, r2.getValue(0));
+        assertNumEquals(Double.parseDouble("171.58666666666666666666666666667"),
                 r2.getValue(series5Minutes.getEndIndex() - 80));
-        assertNumEquals(Double.valueOf("172.78666666666666666666666666667"), r2.getValue(series5Minutes.getEndIndex()));
+        assertNumEquals(Double.parseDouble("172.78666666666666666666666666667"),
+                r2.getValue(series5Minutes.getEndIndex()));
 
         // r3
-        assertEquals(r3.getValue(0), NaN);
-        assertNumEquals(Double.valueOf("172.50333333333333333333333333334"),
+        assertEquals(NaN, r3.getValue(0));
+        assertNumEquals(Double.parseDouble("172.50333333333333333333333333334"),
                 r3.getValue(series5Minutes.getEndIndex() - 80));
-        assertNumEquals(Double.valueOf("174.26333333333333333333333333334"), r3.getValue(series5Minutes.getEndIndex()));
+        assertNumEquals(Double.parseDouble("174.26333333333333333333333333334"),
+                r3.getValue(series5Minutes.getEndIndex()));
 
         var deMarkpp = new DeMarkPivotPointIndicator(series5Minutes, DAY);
         var deMarkR1 = new DeMarkReversalIndicator(deMarkpp, DeMarkReversalIndicator.DeMarkPivotLevel.RESISTANCE);
@@ -1399,14 +1395,14 @@ public class PivotPointIndicatorTest {
     public void PivotPointTestWeeklyBarCount() {
         var pp = new PivotPointIndicator(series1Hours, TimeLevel.WEEK);
 
-        assertEquals(pp.getValue(0), NaN);// first bar no data for
-        assertEquals(pp.getValue(1), NaN);// first bar no data for calculation
-        assertEquals(pp.getValue(6), NaN);// first bar no data for calculation
+        assertEquals(NaN, pp.getValue(0));// first bar no data for
+        assertEquals(NaN, pp.getValue(1));// first bar no data for calculation
+        assertEquals(NaN, pp.getValue(6));// first bar no data for calculation
         // result of calculation for second bar is not adequate because the previous day
         // is incomplete
-        assertNumEquals(Double.valueOf("172.08166"), pp.getValue(28));
-        assertNumEquals(Double.valueOf("170.93666"), pp.getValue(series1Hours.getEndIndex() - 36)); // prev last bar
-        assertNumEquals(Double.valueOf("168.0100"), pp.getValue(series1Hours.getEndIndex())); // last bar
+        assertNumEquals(Double.parseDouble("172.08166"), pp.getValue(28));
+        assertNumEquals(Double.parseDouble("170.93666"), pp.getValue(series1Hours.getEndIndex() - 36)); // prev last bar
+        assertNumEquals(Double.parseDouble("168.0100"), pp.getValue(series1Hours.getEndIndex())); // last bar
 
         var fibR3 = new FibonacciReversalIndicator(pp, 1, FibonacciReversalIndicator.FibReversalTyp.RESISTANCE);
         var fibR2 = new FibonacciReversalIndicator(pp, 0.618, FibonacciReversalIndicator.FibReversalTyp.RESISTANCE);
@@ -1415,12 +1411,12 @@ public class PivotPointIndicatorTest {
         var fibS2 = new FibonacciReversalIndicator(pp, 0.618, FibonacciReversalIndicator.FibReversalTyp.SUPPORT);
         var fibS3 = new FibonacciReversalIndicator(pp, 1, FibonacciReversalIndicator.FibReversalTyp.SUPPORT);
 
-        assertEquals(fibR3.getValue(series1Hours.getBeginIndex()), NaN);
-        assertEquals(fibR2.getValue(1), NaN);
-        assertEquals(fibR1.getValue(2), NaN);
-        assertEquals(fibS1.getValue(6), NaN);
-        assertEquals(fibS2.getValue(series1Hours.getBeginIndex()), NaN);
-        assertEquals(fibS3.getValue(6), NaN);
+        assertEquals(NaN, fibR3.getValue(series1Hours.getBeginIndex()));
+        assertEquals(NaN, fibR2.getValue(1));
+        assertEquals(NaN, fibR1.getValue(2));
+        assertEquals(NaN, fibS1.getValue(6));
+        assertEquals(NaN, fibS2.getValue(series1Hours.getBeginIndex()));
+        assertEquals(NaN, fibS3.getValue(6));
 
         assertEquals(fibR3.getValue(series1Hours.getEndIndex()),
                 pp.getValue(series1Hours.getEndIndex())
@@ -1474,7 +1470,7 @@ public class PivotPointIndicatorTest {
         assertNumEquals(170.5075, deMarkpp.getValue(series1Hours.getEndIndex() - 50));
         assertNumEquals(171.795, deMarkR1.getValue(series1Hours.getEndIndex() - 50));
         assertNumEquals(167.965, deMarkS1.getValue(series1Hours.getEndIndex() - 50));
-        assertNumEquals(168.9225, deMarkpp.getValue(series1Hours.getEndIndex())); // June 61th 2017
+        assertNumEquals(168.9225, deMarkpp.getValue(series1Hours.getEndIndex()));
         assertNumEquals(176.285, deMarkR1.getValue(series1Hours.getEndIndex()));
         assertNumEquals(166.185, deMarkS1.getValue(series1Hours.getEndIndex()));
     }
@@ -1490,48 +1486,48 @@ public class PivotPointIndicatorTest {
         var r3 = new StandardReversalIndicator(pp, RESISTANCE_3);
 
         // pp
-        assertEquals(pp.getValue(0), NaN);
-        assertEquals(pp.getValue(19), NaN); // no previous month for calculation
-        assertNumEquals(Double.valueOf("126.32333"), pp.getValue(20));
-        assertNumEquals(Double.valueOf("134.3415333"), pp.getValue(39));
-        assertNumEquals(Double.valueOf("150.67999"), pp.getValue(series1Days.getEndIndex() - 19));
-        assertNumEquals(Double.valueOf("164.18000"), pp.getValue(series1Days.getEndIndex()));
+        assertEquals(NaN, pp.getValue(0));
+        assertEquals(NaN, pp.getValue(19)); // no previous month for calculation
+        assertNumEquals(Double.parseDouble("126.32333"), pp.getValue(20));
+        assertNumEquals(Double.parseDouble("134.3415333"), pp.getValue(39));
+        assertNumEquals(Double.parseDouble("150.67999"), pp.getValue(series1Days.getEndIndex() - 19));
+        assertNumEquals(Double.parseDouble("164.18000"), pp.getValue(series1Days.getEndIndex()));
 
         // s1
-        assertEquals(s1.getValue(0), NaN);
-        assertEquals(s1.getValue(19), NaN); // no previous month
-        assertNumEquals(Double.valueOf("144.8599999"), s1.getValue(series1Days.getEndIndex() - 19));
-        assertNumEquals(Double.valueOf("152.87"), s1.getValue(series1Days.getEndIndex()));
+        assertEquals(NaN, s1.getValue(0));
+        assertEquals(NaN, s1.getValue(19)); // no previous month
+        assertNumEquals(Double.parseDouble("144.8599999"), s1.getValue(series1Days.getEndIndex() - 19));
+        assertNumEquals(Double.parseDouble("152.87"), s1.getValue(series1Days.getEndIndex()));
 
         // s2
-        assertEquals(s2.getValue(0), NaN);
-        assertEquals(s2.getValue(19), NaN); // no previous month
-        assertNumEquals(Double.valueOf("138.73999999"), s2.getValue(series1Days.getEndIndex() - 19));
-        assertNumEquals(Double.valueOf("136.49000"), s2.getValue(series1Days.getEndIndex()));
+        assertEquals(NaN, s2.getValue(0));
+        assertEquals(NaN, s2.getValue(19)); // no previous month
+        assertNumEquals(Double.parseDouble("138.73999999"), s2.getValue(series1Days.getEndIndex() - 19));
+        assertNumEquals(Double.parseDouble("136.49000"), s2.getValue(series1Days.getEndIndex()));
 
         // s3
-        assertEquals(s3.getValue(0), NaN);
-        assertEquals(s3.getValue(19), NaN); // no previous month
-        assertNumEquals(Double.valueOf("132.92"), s3.getValue(series1Days.getEndIndex() - 19));
-        assertNumEquals(Double.valueOf("125.18"), s3.getValue(series1Days.getEndIndex()));
+        assertEquals(NaN, s3.getValue(0));
+        assertEquals(NaN, s3.getValue(19)); // no previous month
+        assertNumEquals(Double.parseDouble("132.92"), s3.getValue(series1Days.getEndIndex() - 19));
+        assertNumEquals(Double.parseDouble("125.18"), s3.getValue(series1Days.getEndIndex()));
 
         // r1
-        assertEquals(r1.getValue(0), NaN);
-        assertEquals(r1.getValue(19), NaN); // no previous month
-        assertNumEquals(Double.valueOf("156.79999"), r1.getValue(series1Days.getEndIndex() - 19));
-        assertNumEquals(Double.valueOf("180.56000"), r1.getValue(series1Days.getEndIndex()));
+        assertEquals(NaN, r1.getValue(0));
+        assertEquals(NaN, r1.getValue(19)); // no previous month
+        assertNumEquals(Double.parseDouble("156.79999"), r1.getValue(series1Days.getEndIndex() - 19));
+        assertNumEquals(Double.parseDouble("180.56000"), r1.getValue(series1Days.getEndIndex()));
 
         // r2
-        assertEquals(r2.getValue(0), NaN);
-        assertEquals(r2.getValue(19), NaN); // no previous month
-        assertNumEquals(Double.valueOf("162.61999"), r2.getValue(series1Days.getEndIndex() - 19));
-        assertNumEquals(Double.valueOf("191.87000"), r2.getValue(series1Days.getEndIndex()));
+        assertEquals(NaN, r2.getValue(0));
+        assertEquals(NaN, r2.getValue(19)); // no previous month
+        assertNumEquals(Double.parseDouble("162.61999"), r2.getValue(series1Days.getEndIndex() - 19));
+        assertNumEquals(Double.parseDouble("191.87000"), r2.getValue(series1Days.getEndIndex()));
 
         // r3
-        assertEquals(r3.getValue(0), NaN);
-        assertEquals(r3.getValue(19), NaN); // no previous month
-        assertNumEquals(Double.valueOf("168.74"), r3.getValue(series1Days.getEndIndex() - 19));
-        assertNumEquals(Double.valueOf("208.25000"), r3.getValue(series1Days.getEndIndex()));
+        assertEquals(NaN, r3.getValue(0));
+        assertEquals(NaN, r3.getValue(19)); // no previous month
+        assertNumEquals(Double.parseDouble("168.74"), r3.getValue(series1Days.getEndIndex() - 19));
+        assertNumEquals(Double.parseDouble("208.25000"), r3.getValue(series1Days.getEndIndex()));
     }
 
     @Test
@@ -1545,52 +1541,495 @@ public class PivotPointIndicatorTest {
         var r3 = new StandardReversalIndicator(pp, RESISTANCE_3);
 
         // pp
-        assertEquals(pp.getValue(0), NaN);
-        assertEquals(pp.getValue(33), NaN); // no previous year
-        assertNumEquals(Double.valueOf("70.823331"), pp.getValue(series1Weeks.getEndIndex() - 100));
-        assertNumEquals(Double.valueOf("95.77000"), pp.getValue(series1Weeks.getEndIndex() - 40));
-        assertNumEquals(Double.valueOf("112.6400"), pp.getValue(series1Weeks.getEndIndex()));
+        assertEquals(NaN, pp.getValue(0));
+        assertEquals(NaN, pp.getValue(33)); // no previous year
+        assertNumEquals(Double.parseDouble("70.823331"), pp.getValue(series1Weeks.getEndIndex() - 100));
+        assertNumEquals(Double.parseDouble("95.77000"), pp.getValue(series1Weeks.getEndIndex() - 40));
+        assertNumEquals(Double.parseDouble("112.6400"), pp.getValue(series1Weeks.getEndIndex()));
 
         // s1
-        assertEquals(s1.getValue(0), NaN);
-        assertEquals(s1.getValue(33), NaN); // no previous year
-        assertNumEquals(Double.valueOf("59.4766"), s1.getValue(series1Weeks.getEndIndex() - 100));
-        assertNumEquals(Double.valueOf("80.89000"), s1.getValue(series1Weeks.getEndIndex() - 40));
-        assertNumEquals(Double.valueOf("91.7800"), s1.getValue(series1Weeks.getEndIndex()));
+        assertEquals(NaN, s1.getValue(0));
+        assertEquals(NaN, s1.getValue(33)); // no previous year
+        assertNumEquals(Double.parseDouble("59.4766"), s1.getValue(series1Weeks.getEndIndex() - 100));
+        assertNumEquals(Double.parseDouble("80.89000"), s1.getValue(series1Weeks.getEndIndex() - 40));
+        assertNumEquals(Double.parseDouble("91.7800"), s1.getValue(series1Weeks.getEndIndex()));
 
         // s2
-        assertEquals(s2.getValue(0), NaN);
-        assertEquals(s2.getValue(33), NaN); // no previous year
-        assertNumEquals(Double.valueOf("40.5033309"), s2.getValue(series1Weeks.getEndIndex() - 100));
-        assertNumEquals(Double.valueOf("57.11999999"), s2.getValue(series1Weeks.getEndIndex() - 40));
-        assertNumEquals(Double.valueOf("68.510004"), s2.getValue(series1Weeks.getEndIndex()));
+        assertEquals(NaN, s2.getValue(0));
+        assertEquals(NaN, s2.getValue(33)); // no previous year
+        assertNumEquals(Double.parseDouble("40.5033309"), s2.getValue(series1Weeks.getEndIndex() - 100));
+        assertNumEquals(Double.parseDouble("57.11999999"), s2.getValue(series1Weeks.getEndIndex() - 40));
+        assertNumEquals(Double.parseDouble("68.510004"), s2.getValue(series1Weeks.getEndIndex()));
 
         // s3
-        assertEquals(s3.getValue(0), NaN);
-        assertEquals(s3.getValue(33), NaN); // no previous year
-        assertNumEquals(Double.valueOf("29.1566639"), s3.getValue(series1Weeks.getEndIndex() - 100));
-        assertNumEquals(Double.valueOf("42.239999"), s3.getValue(series1Weeks.getEndIndex() - 40));
-        assertNumEquals(Double.valueOf("47.65000"), s3.getValue(series1Weeks.getEndIndex()));
+        assertEquals(NaN, s3.getValue(0));
+        assertEquals(NaN, s3.getValue(33)); // no previous year
+        assertNumEquals(Double.parseDouble("29.1566639"), s3.getValue(series1Weeks.getEndIndex() - 100));
+        assertNumEquals(Double.parseDouble("42.239999"), s3.getValue(series1Weeks.getEndIndex() - 40));
+        assertNumEquals(Double.parseDouble("47.65000"), s3.getValue(series1Weeks.getEndIndex()));
 
         // r1
-        assertEquals(r1.getValue(0), NaN);
-        assertEquals(r1.getValue(33), NaN); // no previous year
-        assertNumEquals(Double.valueOf("89.7966640"), r1.getValue(series1Weeks.getEndIndex() - 100));
-        assertNumEquals(Double.valueOf("119.5400"), r1.getValue(series1Weeks.getEndIndex() - 40));
-        assertNumEquals(Double.valueOf("135.91000"), r1.getValue(series1Weeks.getEndIndex()));
+        assertEquals(NaN, r1.getValue(0));
+        assertEquals(NaN, r1.getValue(33)); // no previous year
+        assertNumEquals(Double.parseDouble("89.7966640"), r1.getValue(series1Weeks.getEndIndex() - 100));
+        assertNumEquals(Double.parseDouble("119.5400"), r1.getValue(series1Weeks.getEndIndex() - 40));
+        assertNumEquals(Double.parseDouble("135.91000"), r1.getValue(series1Weeks.getEndIndex()));
 
         // r2
-        assertEquals(r2.getValue(0), NaN);
-        assertEquals(r2.getValue(33), NaN); // no previous year
-        assertNumEquals(Double.valueOf("101.1433310"), r2.getValue(series1Weeks.getEndIndex() - 100));
-        assertNumEquals(Double.valueOf("134.42000"), r2.getValue(series1Weeks.getEndIndex() - 40));
-        assertNumEquals(Double.valueOf("156.76999"), r2.getValue(series1Weeks.getEndIndex()));
+        assertEquals(NaN, r2.getValue(0));
+        assertEquals(NaN, r2.getValue(33)); // no previous year
+        assertNumEquals(Double.parseDouble("101.1433310"), r2.getValue(series1Weeks.getEndIndex() - 100));
+        assertNumEquals(Double.parseDouble("134.42000"), r2.getValue(series1Weeks.getEndIndex() - 40));
+        assertNumEquals(Double.parseDouble("156.76999"), r2.getValue(series1Weeks.getEndIndex()));
 
         // r3
-        assertEquals(r3.getValue(0), NaN);
-        assertEquals(r3.getValue(33), NaN); // no previous year
-        assertNumEquals(Double.valueOf("120.116664"), r3.getValue(series1Weeks.getEndIndex() - 100));
-        assertNumEquals(Double.valueOf("158.19000"), r3.getValue(series1Weeks.getEndIndex() - 40));
-        assertNumEquals(Double.valueOf("180.03999"), r3.getValue(series1Weeks.getEndIndex()));
+        assertEquals(NaN, r3.getValue(0));
+        assertEquals(NaN, r3.getValue(33)); // no previous year
+        assertNumEquals(Double.parseDouble("120.116664"), r3.getValue(series1Weeks.getEndIndex() - 100));
+        assertNumEquals(Double.parseDouble("158.19000"), r3.getValue(series1Weeks.getEndIndex() - 40));
+        assertNumEquals(Double.parseDouble("180.03999"), r3.getValue(series1Weeks.getEndIndex()));
+    }
+
+    @Test
+    public void shouldIncludeBarAtBeginIndexInPreviousPeriod() {
+        // Create a series where the bar at beginIndex (index 0) is in the previous
+        // period
+        // This tests the boundary condition fix where >= is used instead of >
+        var series = new MockBarSeriesBuilder().withName("BoundaryTest").build();
+
+        // Day 1 (previous period) - this bar is at beginIndex
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-01").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(100.0)
+                .highPrice(105.0)
+                .lowPrice(95.0)
+                .closePrice(102.0)
+                .volume(1000)
+                .add();
+
+        // Day 2 (current period) - pivot point calculation should include Day 1 bar
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-02").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(102.0)
+                .highPrice(108.0)
+                .lowPrice(100.0)
+                .closePrice(106.0)
+                .volume(1200)
+                .add();
+
+        // Day 2 continuation (same period)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-02").atTime(12, 0).atZone(ZoneOffset.UTC).toInstant())
+                .openPrice(106.0)
+                .highPrice(110.0)
+                .lowPrice(104.0)
+                .closePrice(108.0)
+                .volume(800)
+                .add();
+
+        var pp = new PivotPointIndicator(series, DAY);
+        var deMarkpp = new DeMarkPivotPointIndicator(series, DAY);
+
+        // At index 0 (Day 1), no previous period exists
+        assertEquals(NaN, pp.getValue(0));
+        assertEquals(NaN, deMarkpp.getValue(0));
+
+        // At index 1 (first bar of Day 2), should include Day 1 bar in previous period
+        // PivotPoint: (high + low + close) / 3 = (105 + 95 + 102) / 3 = 302 / 3 =
+        // 100.666...
+        assertNumEquals(100.66666666666667, pp.getValue(1));
+
+        // DeMarkPivotPoint: Uses open from first bar of previous period (100.0)
+        // close (102) < open (100) is false, close (102) > open (100) is true
+        // Formula: (2 * high + low + close) / 4 = (2 * 105 + 95 + 102) / 4 = 407 / 4 =
+        // 101.75
+        assertNumEquals(101.75, deMarkpp.getValue(1));
+
+        // Verify that the bar at beginIndex (index 0) is included in the previous
+        // period
+        var barsOfPreviousPeriod = pp.getBarsOfPreviousPeriod(1);
+        assertEquals(1, barsOfPreviousPeriod.size());
+        assertEquals(0, barsOfPreviousPeriod.get(0).intValue()); // Should include index 0
+
+        var deMarkBarsOfPreviousPeriod = deMarkpp.getBarsOfPreviousPeriod(1);
+        assertEquals(1, deMarkBarsOfPreviousPeriod.size());
+        assertEquals(0, deMarkBarsOfPreviousPeriod.get(0).intValue()); // Should include index 0
+
+        // At index 2 (second bar of Day 2), should still include Day 1 bar in previous
+        // period
+        assertNumEquals(100.66666666666667, pp.getValue(2));
+        assertNumEquals(101.75, deMarkpp.getValue(2));
+    }
+
+    @Test
+    public void shouldTreatBeginIndexBarAsCurrentPeriodBoundary() {
+        var series = new MockBarSeriesBuilder().withName("BeginBoundaryGuard").build();
+
+        // Both bars are in the same day; beginIndex bar must be considered when
+        // stepping back through the current period
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-02-01").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(100.0)
+                .highPrice(105.0)
+                .lowPrice(95.0)
+                .closePrice(102.0)
+                .volume(1000)
+                .add();
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-02-01").atTime(12, 0).atZone(ZoneOffset.UTC).toInstant())
+                .openPrice(102.0)
+                .highPrice(108.0)
+                .lowPrice(100.0)
+                .closePrice(106.0)
+                .volume(1200)
+                .add();
+
+        var indicator = new GuardedPivotPointIndicator(series, DAY);
+        var barsOfPreviousPeriod = indicator.getBarsOfPreviousPeriod(1);
+        assertEquals(0, barsOfPreviousPeriod.size());
+    }
+
+    @Test
+    public void shouldHandleBeginIndexGreaterThanZero() {
+        // Create a series with multiple days
+        var series = new MockBarSeriesBuilder().withName("BeginIndexTest").build();
+
+        // Day 1
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-01").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(100.0)
+                .highPrice(105.0)
+                .lowPrice(95.0)
+                .closePrice(102.0)
+                .volume(1000)
+                .add();
+
+        // Day 2
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-02").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(102.0)
+                .highPrice(108.0)
+                .lowPrice(100.0)
+                .closePrice(106.0)
+                .volume(1200)
+                .add();
+
+        // Day 3
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-03").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(106.0)
+                .highPrice(110.0)
+                .lowPrice(104.0)
+                .closePrice(108.0)
+                .volume(800)
+                .add();
+
+        // Day 4
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-04").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(108.0)
+                .highPrice(112.0)
+                .lowPrice(106.0)
+                .closePrice(110.0)
+                .volume(900)
+                .add();
+
+        // Set maximum bar count to 2, which will set beginIndex to 2
+        // This means the series will only contain bars at indices 2 and 3
+        series.setMaximumBarCount(2);
+
+        // Verify beginIndex is now 2
+        assertEquals(2, series.getBeginIndex());
+        assertEquals(3, series.getEndIndex());
+
+        var pp = new PivotPointIndicator(series, DAY);
+        var deMarkpp = new DeMarkPivotPointIndicator(series, DAY);
+
+        // At beginIndex (index 2), there's no previous period, so should return NaN
+        // This tests the fix: when index == beginIndex > 0, it should return early
+        // without trying to access index - 1
+        assertEquals(NaN, pp.getValue(series.getBeginIndex()));
+        assertEquals(NaN, deMarkpp.getValue(series.getBeginIndex()));
+
+        // Verify getBarsOfPreviousPeriod returns empty list at beginIndex
+        var barsOfPreviousPeriod = pp.getBarsOfPreviousPeriod(series.getBeginIndex());
+        assertEquals(0, barsOfPreviousPeriod.size());
+
+        // At index 3 (first bar after beginIndex), should include Day 3 bar in previous
+        // period
+        // Day 3: (110 + 104 + 108) / 3 = 322 / 3 = 107.333...
+        assertNumEquals(107.33333333333333, pp.getValue(3));
+    }
+
+    /**
+     * Testable subclass that exposes the protected getPreviousPeriod method for
+     * testing.
+     */
+    private static class TestablePivotPointIndicator extends AbstractPivotPointIndicator {
+        public TestablePivotPointIndicator(BarSeries series, TimeLevel timeLevel) {
+            super(series, timeLevel);
+        }
+
+        @Override
+        protected Num calcPivotPoint(List<Integer> barsOfPreviousPeriod) {
+            // Not used in these tests
+            return null;
+        }
+
+        public long getPreviousPeriodForTesting(Bar bar, int indexOfPreviousBar) {
+            return getPreviousPeriod(bar, indexOfPreviousBar);
+        }
+    }
+
+    private static final class GuardedPivotPointIndicator extends TestablePivotPointIndicator {
+        public GuardedPivotPointIndicator(BarSeries series, TimeLevel timeLevel) {
+            super(series, timeLevel);
+        }
+
+        @Override
+        protected long getPreviousPeriod(Bar bar, int indexOfPreviousBar) {
+            if (indexOfPreviousBar >= getBarSeries().getBeginIndex()) {
+                var previousBar = getBarSeries().getBar(indexOfPreviousBar);
+                assertFalse("Expected beginIndex bar to be treated as part of the current period boundary",
+                        getPeriod(previousBar) == getPeriod(bar));
+            }
+            return super.getPreviousPeriod(bar, indexOfPreviousBar);
+        }
+    }
+
+    @Test
+    public void shouldSkipWeekendWhenFindingPreviousDay() {
+        // Create a series: Friday (2024-01-05), then Monday (2024-01-08)
+        // Day of year: Friday = 5, Saturday = 6, Sunday = 7, Monday = 8
+        var series = new MockBarSeriesBuilder().withName("WeekendTest").build();
+
+        // Friday, January 5, 2024 (day of year: 5)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-05").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(100.0)
+                .highPrice(105.0)
+                .lowPrice(95.0)
+                .closePrice(102.0)
+                .volume(1000)
+                .add();
+
+        // Monday, January 8, 2024 (day of year: 8)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-08").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(102.0)
+                .highPrice(108.0)
+                .lowPrice(100.0)
+                .closePrice(106.0)
+                .volume(1200)
+                .add();
+
+        var indicator = new TestablePivotPointIndicator(series, DAY);
+        var mondayBar = series.getBar(1);
+        var fridayIndex = 0;
+
+        // When asking for previous period of Monday (day 8), should return Friday (day
+        // 5)
+        // The loop should skip Saturday (6) and Sunday (7) and find Friday (5)
+        long previousPeriod = indicator.getPreviousPeriodForTesting(mondayBar, fridayIndex);
+        assertEquals(5L, previousPeriod);
+    }
+
+    @Test
+    public void shouldSkipHolidayWhenFindingPreviousDay() {
+        // Create a series: Monday (2024-01-01), then Wednesday (2024-01-03)
+        // Day of year: Monday = 1, Tuesday = 2 (holiday), Wednesday = 3
+        var series = new MockBarSeriesBuilder().withName("HolidayTest").build();
+
+        // Monday, January 1, 2024 (day of year: 1)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-01").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(100.0)
+                .highPrice(105.0)
+                .lowPrice(95.0)
+                .closePrice(102.0)
+                .volume(1000)
+                .add();
+
+        // Wednesday, January 3, 2024 (day of year: 3)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-03").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(102.0)
+                .highPrice(108.0)
+                .lowPrice(100.0)
+                .closePrice(106.0)
+                .volume(1200)
+                .add();
+
+        var indicator = new TestablePivotPointIndicator(series, DAY);
+        var wednesdayBar = series.getBar(1);
+        var mondayIndex = 0;
+
+        // When asking for previous period of Wednesday (day 3), should return Monday
+        // (day 1)
+        // The loop should skip Tuesday (2) and find Monday (1)
+        long previousPeriod = indicator.getPreviousPeriodForTesting(wednesdayBar, mondayIndex);
+        assertEquals(1L, previousPeriod);
+    }
+
+    @Test
+    public void shouldSkipMultipleGapsWhenFindingPreviousDay() {
+        // Create a series: Wednesday (2024-01-03), then Monday (2024-01-08)
+        // Day of year: Wed = 3, Thu = 4, Fri = 5, Sat = 6, Sun = 7, Mon = 8
+        var series = new MockBarSeriesBuilder().withName("MultipleGapsTest").build();
+
+        // Wednesday, January 3, 2024 (day of year: 3)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-03").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(100.0)
+                .highPrice(105.0)
+                .lowPrice(95.0)
+                .closePrice(102.0)
+                .volume(1000)
+                .add();
+
+        // Monday, January 8, 2024 (day of year: 8)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-08").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(102.0)
+                .highPrice(108.0)
+                .lowPrice(100.0)
+                .closePrice(106.0)
+                .volume(1200)
+                .add();
+
+        var indicator = new TestablePivotPointIndicator(series, DAY);
+        var mondayBar = series.getBar(1);
+        var wednesdayIndex = 0;
+
+        // When asking for previous period of Monday (day 8), should return Wednesday
+        // (day 3)
+        // The loop should skip Thu (4), Fri (5), Sat (6), Sun (7) and find Wed (3)
+        long previousPeriod = indicator.getPreviousPeriodForTesting(mondayBar, wednesdayIndex);
+        assertEquals(3L, previousPeriod);
+    }
+
+    @Test
+    public void shouldHandleConsecutiveDaysCorrectly() {
+        // Create a series with consecutive trading days: Mon, Tue, Wed
+        var series = new MockBarSeriesBuilder().withName("ConsecutiveDaysTest").build();
+
+        // Monday, January 1, 2024 (day of year: 1)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-01").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(100.0)
+                .highPrice(105.0)
+                .lowPrice(95.0)
+                .closePrice(102.0)
+                .volume(1000)
+                .add();
+
+        // Tuesday, January 2, 2024 (day of year: 2)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-02").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(102.0)
+                .highPrice(108.0)
+                .lowPrice(100.0)
+                .closePrice(106.0)
+                .volume(1200)
+                .add();
+
+        // Wednesday, January 3, 2024 (day of year: 3)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-03").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(106.0)
+                .highPrice(110.0)
+                .lowPrice(104.0)
+                .closePrice(108.0)
+                .volume(800)
+                .add();
+
+        var indicator = new TestablePivotPointIndicator(series, DAY);
+        var wednesdayBar = series.getBar(2);
+        var tuesdayIndex = 1;
+
+        // When asking for previous period of Wednesday (day 3), should return Tuesday
+        // (day 2)
+        // No gaps, so should match immediately
+        long previousPeriod = indicator.getPreviousPeriodForTesting(wednesdayBar, tuesdayIndex);
+        assertEquals(2L, previousPeriod);
+    }
+
+    @Test
+    public void shouldUpdatePreviousZonedEndTimeOnEachIteration() {
+        // This test specifically verifies the bug fix: previousZonedEndTime must be
+        // updated on each loop iteration, not just once before the loop.
+        // Create a series: Friday, then Monday (weekend gap)
+        var series = new MockBarSeriesBuilder().withName("StaleVariableFixTest").build();
+
+        // Friday, January 5, 2024 (day of year: 5)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-05").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(100.0)
+                .highPrice(105.0)
+                .lowPrice(95.0)
+                .closePrice(102.0)
+                .volume(1000)
+                .add();
+
+        // Monday, January 8, 2024 (day of year: 8)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-08").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(102.0)
+                .highPrice(108.0)
+                .lowPrice(100.0)
+                .closePrice(106.0)
+                .volume(1200)
+                .add();
+
+        var indicator = new TestablePivotPointIndicator(series, DAY);
+        var mondayBar = series.getBar(1);
+        var fridayIndex = 0;
+
+        // The bug was that previousZonedEndTime was fetched once before the loop
+        // and never updated. With the fix, it should be fetched on each iteration.
+        // When prevCalendarDay starts at 7 (Sunday), it should check the bar at
+        // fridayIndex (which is day 5), see it doesn't match, decrement to 6,
+        // check again (still doesn't match), decrement to 5, and then match.
+        // This verifies that previousZonedEndTime is being re-fetched correctly.
+        long previousPeriod = indicator.getPreviousPeriodForTesting(mondayBar, fridayIndex);
+        assertEquals(5L, previousPeriod);
+    }
+
+    @Test
+    public void shouldHandleYearBoundaryCorrectly() {
+        // Test edge case: previous day crosses year boundary
+        // December 31, 2023 -> January 1, 2024
+        var series = new MockBarSeriesBuilder().withName("YearBoundaryTest").build();
+
+        // December 31, 2023 (day of year: 365)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2023-12-31").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(100.0)
+                .highPrice(105.0)
+                .lowPrice(95.0)
+                .closePrice(102.0)
+                .volume(1000)
+                .add();
+
+        // January 1, 2024 (day of year: 1)
+        series.barBuilder()
+                .endTime(LocalDate.parse("2024-01-01").atStartOfDay(ZoneOffset.UTC).toInstant())
+                .openPrice(102.0)
+                .highPrice(108.0)
+                .lowPrice(100.0)
+                .closePrice(106.0)
+                .volume(1200)
+                .add();
+
+        var indicator = new TestablePivotPointIndicator(series, DAY);
+        var januaryBar = series.getBar(1);
+        var decemberIndex = 0;
+
+        // When asking for previous period of January 1 (day 1), should return December
+        // 31 (day 365)
+        // Note: The method uses day of year, so it should correctly handle the year
+        // boundary
+        long previousPeriod = indicator.getPreviousPeriodForTesting(januaryBar, decemberIndex);
+        assertEquals(365L, previousPeriod);
     }
 }

@@ -1,0 +1,575 @@
+name: Release Health Check
+
+concurrency:
+  group: release-health-${{ github.repository }}
+
+on:
+  push:
+    branches:
+      - master
+  schedule:
+    - cron: "0 9 * * *"
+  workflow_run:
+    workflows: ["Publish Release to Maven Central", "Publish Snapshot to Maven Central"]
+    types:
+      - completed
+  workflow_dispatch:
+    inputs:
+      staleDays:
+        description: "Days before a release PR is considered stale."
+        required: false
+        default: "7"
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+  discussions: write
+
+jobs:
+  health:
+    name: Release health checks
+    runs-on: ubuntu-latest
+    if: |
+      github.event_name != 'workflow_run' ||
+      (
+        github.event.workflow_run.head_repository.full_name == github.repository
+      )
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Fetch tags
+        run: git fetch --tags
+
+      - name: Resolve default branch
+        id: default_branch
+        run: |
+          set -euo pipefail
+          echo "::group::Resolve default branch"
+
+          branch="${{ github.event.repository.default_branch }}"
+          if [ -z "$branch" ]; then
+            branch=$(git symbolic-ref refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@' || true)
+          fi
+          if [ -z "$branch" ]; then
+            branch=$(git remote show origin 2>/dev/null | awk '/HEAD branch/ {print $NF}' || true)
+          fi
+          if [ -z "$branch" ]; then
+            echo "Default branch not provided by event or git." >&2
+            exit 1
+          fi
+          echo "branch=$branch" >> $GITHUB_OUTPUT
+          echo "audit:default_branch=$branch"
+          echo "::endgroup::"
+
+      - name: Collect tag and version state
+        id: state
+        env:
+          DEFAULT_BRANCH: ${{ steps.default_branch.outputs.branch }}
+        run: |
+          set -euo pipefail
+          echo "::group::Collect release tag and version state"
+
+          git fetch origin "$DEFAULT_BRANCH" --tags
+
+          target_ref="origin/${DEFAULT_BRANCH}"
+          tag_state_file=$(mktemp)
+          scripts/resolve-release-tags.sh "$target_ref" > "$tag_state_file"
+
+          latest_tag="none"
+          while IFS='=' read -r key value; do
+            case "$key" in
+              latest_tag) latest_tag="$value" ;;
+            esac
+          done < "$tag_state_file"
+
+          cat "$tag_state_file" >> "$GITHUB_OUTPUT"
+          cp "$tag_state_file" tag-resolution.txt
+          rm -f "$tag_state_file"
+
+          pom_version=$(python3 - <<'PY'
+          import sys
+          import xml.etree.ElementTree as ET
+
+          def find_version(path):
+              tree = ET.parse(path)
+              root = tree.getroot()
+              def find_first(elem):
+                  if elem is None:
+                      return None
+                  for child in elem:
+                      if child.tag.endswith("version"):
+                          text = (child.text or "").strip()
+                          if text:
+                              return text
+                  return None
+              return find_first(root) or find_first(root.find("./{*}parent"))
+
+          ver = find_version("pom.xml")
+          if not ver:
+              sys.exit(1)
+          print(ver)
+          PY
+          ) || { echo "Could not read pom.xml version" >&2; exit 1; }
+
+          pom_snapshot=false
+          pom_base="$pom_version"
+          if [[ "$pom_version" == *-SNAPSHOT ]]; then
+            pom_snapshot=true
+            pom_base="${pom_version%-SNAPSHOT}"
+          fi
+
+          snapshot_ok="n/a"
+          if [ "$latest_tag" != "none" ]; then
+            latest_base="${latest_tag#v}"
+            if [ "$pom_snapshot" != "true" ]; then
+              snapshot_ok=false
+            else
+              highest=$(printf '%s\n' "$latest_base" "$pom_base" | sort -V | tail -n1)
+              if [ "$highest" = "$pom_base" ] && [ "$pom_base" != "$latest_base" ]; then
+                snapshot_ok=true
+              else
+                snapshot_ok=false
+              fi
+            fi
+          fi
+
+          notes_present="n/a"
+          if [ "$latest_tag" != "none" ]; then
+            if git cat-file -e "${latest_tag}:release/${latest_tag}.md" 2>/dev/null; then
+              notes_present=true
+            elif git cat-file -e "${latest_tag}:release/${latest_tag#v}.md" 2>/dev/null; then
+              notes_present=true
+            else
+              notes_present=false
+            fi
+          fi
+
+          echo "pom_version=$pom_version" >> $GITHUB_OUTPUT
+          echo "pom_base=$pom_base" >> $GITHUB_OUTPUT
+          echo "pom_snapshot=$pom_snapshot" >> $GITHUB_OUTPUT
+          echo "snapshot_ok=$snapshot_ok" >> $GITHUB_OUTPUT
+          echo "release_notes_present=$notes_present" >> $GITHUB_OUTPUT
+          echo "::endgroup::"
+
+      - name: Resolve snapshot publication state
+        id: snapshot_publication
+        env:
+          POM_VERSION: ${{ steps.state.outputs.pom_version }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/release_helpers.py snapshot-publication \
+            --version "${POM_VERSION}" \
+            --output snapshot-publication.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Resolve snapshot publication policy
+        id: snapshot_policy
+        env:
+          HEALTH_EVENT_NAME: ${{ github.event_name }}
+          HEALTH_TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
+        run: |
+          set -euo pipefail
+          python3 scripts/release/release_helpers.py snapshot-publication-policy \
+            --event-name "${HEALTH_EVENT_NAME}" \
+            --workflow-name "${HEALTH_TRIGGER_WORKFLOW}" \
+            --output snapshot-publication-policy.json \
+            --github-output "$GITHUB_OUTPUT"
+
+      - name: Check for stale release PRs
+        id: stale_prs
+        uses: actions/github-script@v8
+        env:
+          INPUT_STALE_DAYS: ${{ github.event.inputs.staleDays }}
+          VAR_STALE_DAYS: ${{ vars.RELEASE_PR_STALE_DAYS }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const inputDays = process.env.INPUT_STALE_DAYS;
+            const varDays = process.env.VAR_STALE_DAYS;
+            const staleDays = Number(inputDays || varDays || "7");
+
+            if (!Number.isFinite(staleDays) || staleDays <= 0) {
+              throw new Error(`Invalid stale day threshold: ${inputDays || varDays}`);
+            }
+
+            const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000);
+            const prs = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: "open",
+              per_page: 100
+            });
+
+            const stale = prs.filter((pr) => {
+              const labels = pr.labels || [];
+              const hasReleaseLabel = labels.some((label) => label.name === "release");
+              if (!hasReleaseLabel) {
+                return false;
+              }
+              return new Date(pr.created_at) < cutoff;
+            });
+
+            const lines = stale.map((pr) => {
+              const ageDays = Math.floor((Date.now() - new Date(pr.created_at)) / (24 * 60 * 60 * 1000));
+              return `#${pr.number} ${pr.title} (${ageDays} days old)`;
+            });
+
+            core.setOutput("stale_days", staleDays.toString());
+            core.setOutput("stale_count", stale.length.toString());
+            core.setOutput("stale_list", lines.join("\n") || "(none)");
+
+      - name: Build health summary
+        id: summary
+        if: always()
+        env:
+          DEFAULT_BRANCH: ${{ steps.default_branch.outputs.branch }}
+          LATEST_TAG: ${{ steps.state.outputs.latest_tag }}
+          LAST_REACHABLE_TAG: ${{ steps.state.outputs.last_reachable_tag }}
+          LAST_FIRST_PARENT_TAG: ${{ steps.state.outputs.last_first_parent_tag }}
+          LATEST_TAG_REACHABLE: ${{ steps.state.outputs.latest_tag_reachable }}
+          POM_VERSION: ${{ steps.state.outputs.pom_version }}
+          POM_BASE: ${{ steps.state.outputs.pom_base }}
+          POM_SNAPSHOT: ${{ steps.state.outputs.pom_snapshot }}
+          SNAPSHOT_OK: ${{ steps.state.outputs.snapshot_ok }}
+          SNAPSHOT_PUBLICATION: ${{ steps.snapshot_publication.outputs.snapshot_publication }}
+          SNAPSHOT_PUBLICATION_LATEST: ${{ steps.snapshot_publication.outputs.snapshot_publication_latest }}
+          SNAPSHOT_PUBLICATION_LAST_UPDATED: ${{ steps.snapshot_publication.outputs.snapshot_publication_last_updated }}
+          SNAPSHOT_PUBLICATION_SOURCE: ${{ steps.snapshot_publication.outputs.snapshot_publication_source }}
+          SNAPSHOT_PUBLICATION_ENFORCED: ${{ steps.snapshot_policy.outputs.snapshot_publication_enforced }}
+          SNAPSHOT_PUBLICATION_PENDING_REASON: ${{ steps.snapshot_policy.outputs.snapshot_publication_pending_reason }}
+          NOTES_PRESENT: ${{ steps.state.outputs.release_notes_present }}
+          STALE_DAYS: ${{ steps.stale_prs.outputs.stale_days }}
+          STALE_COUNT: ${{ steps.stale_prs.outputs.stale_count }}
+          STALE_LIST: ${{ steps.stale_prs.outputs.stale_list }}
+          RELEASE_NOTIFY_USER: ${{ vars.RELEASE_NOTIFY_USER }}
+          HEALTH_EVENT_NAME: ${{ github.event_name }}
+          HEALTH_TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${DEFAULT_BRANCH:-}" ]; then
+            DEFAULT_BRANCH="(unknown)"
+          fi
+          if [ -z "${LATEST_TAG:-}" ]; then
+            LATEST_TAG="(unknown)"
+          fi
+          if [ -z "${LAST_REACHABLE_TAG:-}" ]; then
+            LAST_REACHABLE_TAG="(unknown)"
+          fi
+          if [ -z "${LAST_FIRST_PARENT_TAG:-}" ]; then
+            LAST_FIRST_PARENT_TAG="(unknown)"
+          fi
+          if [ -z "${LATEST_TAG_REACHABLE:-}" ]; then
+            LATEST_TAG_REACHABLE="(unknown)"
+          fi
+          if [ -z "${POM_VERSION:-}" ]; then
+            POM_VERSION="(unknown)"
+          fi
+          if [ -z "${POM_BASE:-}" ]; then
+            POM_BASE="(unknown)"
+          fi
+          if [ -z "${POM_SNAPSHOT:-}" ]; then
+            POM_SNAPSHOT="(unknown)"
+          fi
+          if [ -z "${SNAPSHOT_OK:-}" ]; then
+            SNAPSHOT_OK="(unknown)"
+          fi
+          if [ -z "${SNAPSHOT_PUBLICATION:-}" ]; then
+            SNAPSHOT_PUBLICATION="unknown"
+          fi
+          if [ -z "${SNAPSHOT_PUBLICATION_LATEST:-}" ]; then
+            SNAPSHOT_PUBLICATION_LATEST="(unknown)"
+          fi
+          if [ -z "${SNAPSHOT_PUBLICATION_LAST_UPDATED:-}" ]; then
+            SNAPSHOT_PUBLICATION_LAST_UPDATED="(unknown)"
+          fi
+          if [ -z "${SNAPSHOT_PUBLICATION_SOURCE:-}" ]; then
+            SNAPSHOT_PUBLICATION_SOURCE="(unknown)"
+          fi
+          if [ -z "${SNAPSHOT_PUBLICATION_ENFORCED:-}" ]; then
+            SNAPSHOT_PUBLICATION_ENFORCED="false"
+          fi
+          if [ -z "${SNAPSHOT_PUBLICATION_PENDING_REASON:-}" ]; then
+            SNAPSHOT_PUBLICATION_PENDING_REASON="(none)"
+          fi
+          if [ -z "${NOTES_PRESENT:-}" ]; then
+            NOTES_PRESENT="(unknown)"
+          fi
+          if [ -z "${STALE_DAYS:-}" ]; then
+            STALE_DAYS="(unknown)"
+          fi
+          if [ -z "${STALE_COUNT:-}" ]; then
+            STALE_COUNT="0"
+          fi
+          if [ -z "${STALE_LIST:-}" ]; then
+            STALE_LIST="(none)"
+          fi
+          if [ -z "${HEALTH_EVENT_NAME:-}" ]; then
+            HEALTH_EVENT_NAME="(unknown)"
+          fi
+          if [ -z "${HEALTH_TRIGGER_WORKFLOW:-}" ]; then
+            HEALTH_TRIGGER_WORKFLOW="(none)"
+          fi
+
+          effective_snapshot_publication="${SNAPSHOT_PUBLICATION}"
+          snapshot_publication_note="(none)"
+          if [ "${SNAPSHOT_PUBLICATION_ENFORCED}" != "true" ] && [[ "${SNAPSHOT_PUBLICATION}" == "false" || "${SNAPSHOT_PUBLICATION}" == "unknown" ]]; then
+            effective_snapshot_publication="pending"
+            snapshot_publication_note="${SNAPSHOT_PUBLICATION_PENDING_REASON}"
+          fi
+
+          drift=false
+          reasons=()
+
+          if [ "$LATEST_TAG_REACHABLE" = "false" ]; then
+            drift=true
+            reasons+=("latest tag not reachable from ${DEFAULT_BRANCH}")
+          fi
+
+          if [ "$SNAPSHOT_OK" = "false" ]; then
+            drift=true
+            reasons+=("pom.xml snapshot version not ahead of latest tag")
+          fi
+
+          if [ "$effective_snapshot_publication" = "false" ]; then
+            drift=true
+            reasons+=("current snapshot version not published to Maven snapshot repository")
+          fi
+
+          if [ "$effective_snapshot_publication" = "unknown" ]; then
+            drift=true
+            reasons+=("snapshot publication state could not be verified")
+          fi
+
+          if [ "$NOTES_PRESENT" = "false" ]; then
+            drift=true
+            reasons+=("missing release notes for latest tag")
+          fi
+
+          if [ "${STALE_COUNT:-0}" -gt 0 ]; then
+            drift=true
+            reasons+=("stale release PRs detected")
+          fi
+
+          if [ "${#reasons[@]}" -eq 0 ]; then
+            reason_text="(none)"
+          else
+            reason_text=$(printf '%s\n' "${reasons[@]}")
+          fi
+
+          if [ "$drift" = "true" ]; then
+            status="FAIL"
+          else
+            status="OK"
+          fi
+
+          run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          timestamp=$(date '+%-I:%M:%S %p on %-m.%-d.%Y')
+          notify_user="${RELEASE_NOTIFY_USER:-TheCookieLab}"
+
+          cat > notification-body.txt <<EOF
+          <!-- ta4j:post-type=release-health;run=real -->
+          @${notify_user}
+
+          **Release Health Check ${status} at ${timestamp}**
+          - Repository: ${GITHUB_REPOSITORY}
+          - Run: ${run_url}
+          - Default branch: ${DEFAULT_BRANCH}
+          - Event: ${HEALTH_EVENT_NAME}
+          - Upstream workflow: ${HEALTH_TRIGGER_WORKFLOW}
+
+          Tag Health:
+          - latest tag: ${LATEST_TAG}
+          - last reachable tag: ${LAST_REACHABLE_TAG}
+          - last first-parent tag: ${LAST_FIRST_PARENT_TAG}
+          - latest tag reachable: ${LATEST_TAG_REACHABLE}
+          - release notes present: ${NOTES_PRESENT}
+
+          Version Health:
+          - pom.xml version: ${POM_VERSION}
+          - pom.xml base: ${POM_BASE}
+          - pom.xml snapshot: ${POM_SNAPSHOT}
+          - snapshot ahead of latest tag: ${SNAPSHOT_OK}
+          - snapshot publication enforced: ${SNAPSHOT_PUBLICATION_ENFORCED}
+          - snapshot published: ${effective_snapshot_publication}
+          - snapshot publication note: ${snapshot_publication_note}
+          - snapshot metadata latest: ${SNAPSHOT_PUBLICATION_LATEST}
+          - snapshot metadata last updated: ${SNAPSHOT_PUBLICATION_LAST_UPDATED}
+
+          Stale Release PRs (>${STALE_DAYS} days):
+          - count: ${STALE_COUNT}
+          ${STALE_LIST}
+
+          Drift reasons:
+          ${reason_text}
+          EOF
+
+          echo "drift_found=$drift" >> $GITHUB_OUTPUT
+          cat > release-health-audit.json <<EOF
+          {
+            "status": "${status}",
+            "drift": "${drift}",
+            "defaultBranch": "${DEFAULT_BRANCH}",
+            "latestTag": "${LATEST_TAG}",
+            "lastReachableTag": "${LAST_REACHABLE_TAG}",
+            "lastFirstParentTag": "${LAST_FIRST_PARENT_TAG}",
+            "latestTagReachable": "${LATEST_TAG_REACHABLE}",
+            "pomVersion": "${POM_VERSION}",
+            "pomBase": "${POM_BASE}",
+            "pomSnapshot": "${POM_SNAPSHOT}",
+            "snapshotOk": "${SNAPSHOT_OK}",
+            "snapshotPublicationEnforced": "${SNAPSHOT_PUBLICATION_ENFORCED}",
+            "snapshotPublished": "${effective_snapshot_publication}",
+            "snapshotPublicationNote": "${snapshot_publication_note}",
+            "snapshotMetadataLatest": "${SNAPSHOT_PUBLICATION_LATEST}",
+            "snapshotMetadataLastUpdated": "${SNAPSHOT_PUBLICATION_LAST_UPDATED}",
+            "snapshotMetadataSource": "${SNAPSHOT_PUBLICATION_SOURCE}",
+            "releaseNotesPresent": "${NOTES_PRESENT}",
+            "staleReleasePrCount": "${STALE_COUNT}",
+            "runUrl": "${run_url}"
+          }
+          EOF
+          {
+            echo "## Release Health"
+            echo ""
+            echo "- status: ${status}"
+            echo "- drift: ${drift}"
+            echo "- latest tag: ${LATEST_TAG}"
+            echo "- last reachable tag: ${LAST_REACHABLE_TAG}"
+            echo "- latest tag reachable: ${LATEST_TAG_REACHABLE}"
+            echo "- pom version: ${POM_VERSION}"
+            echo "- snapshot ahead of latest tag: ${SNAPSHOT_OK}"
+            echo "- snapshot publication enforced: ${SNAPSHOT_PUBLICATION_ENFORCED}"
+            echo "- snapshot published: ${effective_snapshot_publication}"
+            echo "- stale release PR count: ${STALE_COUNT}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release health audit artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-health-audit-${{ github.run_id }}
+          path: |
+            tag-resolution.txt
+            snapshot-publication.json
+            snapshot-publication-policy.json
+            release-health-audit.json
+            notification-body.txt
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Post to Release Scheduler discussion
+        if: always()
+        uses: actions/github-script@v8
+        env:
+          RELEASE_SCHEDULER_DISCUSSION_NUMBER: ${{ vars.RELEASE_SCHEDULER_DISCUSSION_NUMBER }}
+          RELEASE_NOTIFY_USER: ${{ vars.RELEASE_NOTIFY_USER }}
+        with:
+          github-token: ${{ github.token }}
+          script: |
+            const fs = require("fs");
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const notifyUser = process.env.RELEASE_NOTIFY_USER || "TheCookieLab";
+            const runUrl = process.env.GITHUB_RUN_ID
+              ? `https://github.com/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`
+              : "(unknown)";
+            let body;
+            if (fs.existsSync("notification-body.txt")) {
+              body = fs.readFileSync("notification-body.txt", "utf8");
+            } else {
+              core.warning("notification-body.txt not found; posting fallback message.");
+              body = `<!-- ta4j:post-type=release-health;run=real -->\n@${notifyUser}\n\n**Release Health Check summary unavailable**\n- Repository: ${process.env.GITHUB_REPOSITORY || `${owner}/${repo}`}\n- Run: ${runUrl}\n\nThe summary step did not produce notification-body.txt. Check earlier steps for failures.`;
+            }
+            const rawNumber = process.env.RELEASE_SCHEDULER_DISCUSSION_NUMBER;
+            const number = rawNumber ? Number(rawNumber) : 1414;
+            if (!Number.isFinite(number)) {
+              throw new Error(`Invalid Release Scheduler discussion number: ${rawNumber}`);
+            }
+
+            const query = `
+              query($owner: String!, $repo: String!, $number: Int!) {
+                repository(owner: $owner, name: $repo) {
+                  discussion(number: $number) {
+                    id
+                  }
+                }
+              }
+            `;
+            const queryResult = await github.graphql(query, { owner, repo, number });
+            const discussionId = queryResult?.repository?.discussion?.id;
+            if (!discussionId) {
+              throw new Error(`Discussion ${number} not found in ${owner}/${repo}`);
+            }
+
+            const commentQuery = `
+              query($owner: String!, $repo: String!, $number: Int!, $cursor: String) {
+                repository(owner: $owner, name: $repo) {
+                  discussion(number: $number) {
+                    comments(first: 100, after: $cursor) {
+                      nodes {
+                        id
+                        body
+                      }
+                      pageInfo {
+                        hasNextPage
+                        endCursor
+                      }
+                    }
+                  }
+                }
+              }
+            `;
+            const deleteMutation = `
+              mutation($id: ID!) {
+                deleteDiscussionComment(input: { id: $id }) {
+                  clientMutationId
+                }
+              }
+            `;
+            const healthCheckMarker = "<!-- ta4j:post-type=release-health;run=real -->";
+            let cursor = null;
+            let deletedCount = 0;
+            let scannedCount = 0;
+            do {
+              const commentResult = await github.graphql(commentQuery, { owner, repo, number, cursor });
+              const page = commentResult?.repository?.discussion?.comments;
+              const nodes = page?.nodes || [];
+              scannedCount += nodes.length;
+              const deletions = nodes.filter((comment) => {
+                if (!comment?.body) {
+                  return false;
+                }
+                return comment.body.includes(healthCheckMarker);
+              });
+              for (const comment of deletions) {
+                await github.graphql(deleteMutation, { id: comment.id });
+                deletedCount += 1;
+              }
+              cursor = page?.pageInfo?.hasNextPage ? page.pageInfo.endCursor : null;
+            } while (cursor);
+            core.info(`Scanned ${scannedCount} discussion comments; removed ${deletedCount} prior health check posts.`);
+
+            const mutation = `
+              mutation($discussionId: ID!, $body: String!) {
+                addDiscussionComment(input: { discussionId: $discussionId, body: $body }) {
+                  comment {
+                    url
+                  }
+                }
+              }
+            `;
+            await github.graphql(mutation, { discussionId, body });
+
+      - name: Fail if drift detected
+        if: steps.summary.outputs.drift_found == 'true'
+        run: |
+          echo "::error::Release health check failed due to detected drift."
+          exit 1

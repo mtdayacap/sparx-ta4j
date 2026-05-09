@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.numeric;
 
@@ -108,7 +88,7 @@ public class NumericIndicator implements Indicator<Num> {
      * @return {@code this + other}, rounded as necessary
      */
     public NumericIndicator plus(Indicator<Num> other) {
-        return NumericIndicator.of(BinaryOperation.sum(this, other));
+        return NumericIndicator.of(BinaryOperationIndicator.sum(this, other));
     }
 
     /**
@@ -124,7 +104,7 @@ public class NumericIndicator implements Indicator<Num> {
      * @return {@code this - other}, rounded as necessary
      */
     public NumericIndicator minus(Indicator<Num> other) {
-        return NumericIndicator.of(BinaryOperation.difference(this, other));
+        return NumericIndicator.of(BinaryOperationIndicator.difference(this, other));
     }
 
     /**
@@ -140,7 +120,7 @@ public class NumericIndicator implements Indicator<Num> {
      * @return {@code this * other}, rounded as necessary
      */
     public NumericIndicator multipliedBy(Indicator<Num> other) {
-        return NumericIndicator.of(BinaryOperation.product(this, other));
+        return NumericIndicator.of(BinaryOperationIndicator.product(this, other));
     }
 
     /**
@@ -156,7 +136,7 @@ public class NumericIndicator implements Indicator<Num> {
      * @return {@code this / other}, rounded as necessary
      */
     public NumericIndicator dividedBy(Indicator<Num> other) {
-        return NumericIndicator.of(BinaryOperation.quotient(this, other));
+        return NumericIndicator.of(BinaryOperationIndicator.quotient(this, other));
     }
 
     /**
@@ -173,7 +153,7 @@ public class NumericIndicator implements Indicator<Num> {
      *         {@code this} is returned.
      */
     public NumericIndicator min(Indicator<Num> other) {
-        return NumericIndicator.of(BinaryOperation.min(this, other));
+        return NumericIndicator.of(BinaryOperationIndicator.min(this, other));
     }
 
     /**
@@ -191,7 +171,7 @@ public class NumericIndicator implements Indicator<Num> {
      *         {@code this} is returned.
      */
     public NumericIndicator max(Indicator<Num> other) {
-        return NumericIndicator.of(BinaryOperation.max(this, other));
+        return NumericIndicator.of(BinaryOperationIndicator.max(this, other));
     }
 
     /**
@@ -209,7 +189,7 @@ public class NumericIndicator implements Indicator<Num> {
      * @return {@code abs(this)}
      */
     public NumericIndicator abs() {
-        return NumericIndicator.of(UnaryOperation.abs(this));
+        return NumericIndicator.of(UnaryOperationIndicator.abs(this));
     }
 
     /**
@@ -218,7 +198,7 @@ public class NumericIndicator implements Indicator<Num> {
      * @return {@code √(this)}
      */
     public NumericIndicator sqrt() {
-        return NumericIndicator.of(UnaryOperation.sqrt(this));
+        return NumericIndicator.of(UnaryOperationIndicator.sqrt(this));
     }
 
     /**
@@ -283,7 +263,7 @@ public class NumericIndicator implements Indicator<Num> {
      * @return the {@link PreviousValueIndicator} of {@code this} with
      *         {@code barCount=1}
      */
-    public Indicator<Num> previous() {
+    public NumericIndicator previous() {
         return previous(1);
     }
 
@@ -363,7 +343,7 @@ public class NumericIndicator implements Indicator<Num> {
 
     @Override
     public int getCountOfUnstableBars() {
-        return 0;
+        return delegate.getCountOfUnstableBars();
     }
 
     @Override

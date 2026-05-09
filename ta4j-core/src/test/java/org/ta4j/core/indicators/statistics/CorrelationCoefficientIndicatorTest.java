@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.statistics;
 
@@ -104,5 +84,30 @@ public class CorrelationCoefficientIndicatorTest extends AbstractIndicatorTest<I
         assertNumEquals(0.1713, coef.getValue(17));
         assertNumEquals(0.9841, coef.getValue(18));
         assertNumEquals(0.9799, coef.getValue(19));
+    }
+
+    @Test
+    public void sampleAndPopulationCorrelationMatchWhenCovarianceIsScaledConsistently() {
+        var population = CorrelationCoefficientIndicator.ofPopulation(close, volume, 5);
+        var sample = CorrelationCoefficientIndicator.ofSample(close, volume, 5);
+
+        assertTrue(population.getValue(0).isNaN());
+        assertTrue(sample.getValue(0).isNaN());
+        for (int i = 1; i <= 19; i++) {
+            assertNumEquals(population.getValue(i), sample.getValue(i), 1.0e-12);
+        }
+    }
+
+    @Test
+    public void nonPositiveBarCountFallsBackToOne() {
+        var populationWithOne = CorrelationCoefficientIndicator.ofPopulation(close, volume, 1);
+        var populationWithZero = CorrelationCoefficientIndicator.ofPopulation(close, volume, 0);
+        var sampleWithOne = CorrelationCoefficientIndicator.ofSample(close, volume, 1);
+        var sampleWithNegative = CorrelationCoefficientIndicator.ofSample(close, volume, -5);
+
+        for (int i = 0; i <= 19; i++) {
+            assertNumEquals(populationWithOne.getValue(i), populationWithZero.getValue(i), 1.0e-12);
+            assertNumEquals(sampleWithOne.getValue(i), sampleWithNegative.getValue(i), 1.0e-12);
+        }
     }
 }

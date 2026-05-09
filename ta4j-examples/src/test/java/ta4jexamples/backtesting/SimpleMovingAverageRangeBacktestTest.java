@@ -1,34 +1,67 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package ta4jexamples.backtesting;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+
 import org.junit.Test;
+import org.ta4j.core.BarSeries;
+import org.ta4j.core.BaseStrategy;
+import org.ta4j.core.Strategy;
+import org.ta4j.core.Trade;
+import org.ta4j.core.backtest.BacktestExecutionResult;
+import org.ta4j.core.backtest.BacktestExecutor;
+import org.ta4j.core.backtest.TradingStatementExecutionResult.WeightedCriterion;
+import org.ta4j.core.criteria.drawdown.ReturnOverMaxDrawdownCriterion;
+import org.ta4j.core.criteria.pnl.NetProfitCriterion;
+import org.ta4j.core.mocks.MockBarSeriesBuilder;
+import org.ta4j.core.reports.TradingStatement;
+import org.ta4j.core.rules.FixedRule;
 
 public class SimpleMovingAverageRangeBacktestTest {
 
     @Test
     public void test() throws InterruptedException {
         SimpleMovingAverageRangeBacktest.main(null);
+    }
+
+    @Test
+    public void selectTopStrategiesUsesWeightedRankingConvenienceApiAndPreservesCriterionScores() {
+        BacktestExecutionResult result = createBacktestResult();
+
+        List<TradingStatement> expected = result.getTopStrategiesWeighted(2,
+                WeightedCriterion.of(new NetProfitCriterion(), 7.0),
+                WeightedCriterion.of(new ReturnOverMaxDrawdownCriterion(), 3.0));
+        List<TradingStatement> actual = SimpleMovingAverageRangeBacktest.selectTopStrategies(result, 2);
+
+        assertEquals(expected.size(), actual.size());
+        for (int i = 0; i < expected.size(); i++) {
+            assertEquals(expected.get(i).getStrategy().getName(), actual.get(i).getStrategy().getName());
+            assertEquals(2, actual.get(i).getCriterionScores().size());
+
+            Set<String> criterionTypes = new HashSet<>();
+            actual.get(i)
+                    .getCriterionScores()
+                    .keySet()
+                    .forEach(criterion -> criterionTypes.add(criterion.getClass().getName()));
+            assertTrue(criterionTypes.contains(NetProfitCriterion.class.getName()));
+            assertTrue(criterionTypes.contains(ReturnOverMaxDrawdownCriterion.class.getName()));
+        }
+    }
+
+    private BacktestExecutionResult createBacktestResult() {
+        BarSeries series = new MockBarSeriesBuilder().withData(100d, 120d, 90d, 140d, 115d, 130d).build();
+        List<Strategy> strategies = List.of(new BaseStrategy("Hold to finish", new FixedRule(0), new FixedRule(5)),
+                new BaseStrategy("Buy the dip", new FixedRule(2), new FixedRule(3)),
+                new BaseStrategy("Early loss", new FixedRule(1), new FixedRule(2)));
+
+        BacktestExecutor executor = new BacktestExecutor(series);
+        return executor.executeWithRuntimeReport(strategies, series.numFactory().numOf(50), Trade.TradeType.BUY);
     }
 }

@@ -1,40 +1,27 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.rules;
 
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertThrows;
 
 import java.time.Duration;
 import java.time.Instant;
-
 import org.junit.Before;
 import org.junit.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Trade;
+import org.ta4j.core.indicators.ATRIndicator;
+import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.helpers.FixedIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
+import org.ta4j.core.num.Num;
+
+import java.util.Arrays;
+import java.util.List;
 
 public class AverageTrueRangeStopGainRuleTest {
 
@@ -91,10 +78,12 @@ public class AverageTrueRangeStopGainRuleTest {
         var tradingRecord = new BaseTradingRecord();
         tradingRecord.enter(0, series.getBar(0).getClosePrice(), series.numFactory().one());
 
-        var rule = new AverageTrueRangeStopGainRule(series, 3, 2.0);
+        var rules = constructRules(3, 2.0);
 
-        assertFalse(rule.isSatisfied(1, tradingRecord)); // Price is still below stop gain
-        assertFalse(rule.isSatisfied(2, tradingRecord)); // Price is still below stop gain
+        for (var rule : rules) {
+            assertFalse(rule.isSatisfied(1, tradingRecord)); // Price is still below stop gain
+            assertFalse(rule.isSatisfied(2, tradingRecord)); // Price is still below stop gain
+        }
 
         // Simulate a price rise to trigger stop gain
         series.barBuilder()
@@ -105,7 +94,10 @@ public class AverageTrueRangeStopGainRuleTest {
                 .highPrice(19)
                 .volume(1000)
                 .add();
-        assertTrue(rule.isSatisfied(5, tradingRecord)); // Stop gain should trigger now
+
+        for (var rule : rules) {
+            assertTrue(rule.isSatisfied(5, tradingRecord)); // Stop gain should trigger now
+        }
     }
 
     @Test
@@ -113,10 +105,12 @@ public class AverageTrueRangeStopGainRuleTest {
         var tradingRecord = new BaseTradingRecord(Trade.TradeType.SELL);
         tradingRecord.enter(0, series.getBar(0).getClosePrice(), series.numFactory().minusOne());
 
-        var rule = new AverageTrueRangeStopGainRule(series, 3, 1);
+        var rules = constructRules(3, 1);
 
-        assertFalse(rule.isSatisfied(1, tradingRecord)); // Price is still above stop gain
-        assertFalse(rule.isSatisfied(2, tradingRecord)); // Price is still above stop gain
+        for (var rule : rules) {
+            assertFalse(rule.isSatisfied(1, tradingRecord)); // Price is still above stop gain
+            assertFalse(rule.isSatisfied(2, tradingRecord)); // Price is still above stop gain
+        }
 
         // Simulate a price drop to trigger stop gain
         series.barBuilder()
@@ -127,7 +121,10 @@ public class AverageTrueRangeStopGainRuleTest {
                 .closePrice(4)
                 .volume(1000)
                 .add();
-        assertTrue(rule.isSatisfied(5, tradingRecord)); // Stop gain should trigger now
+
+        for (var rule : rules) {
+            assertTrue(rule.isSatisfied(5, tradingRecord)); // Stop gain should trigger now
+        }
     }
 
     @Test
@@ -135,22 +132,64 @@ public class AverageTrueRangeStopGainRuleTest {
         var tradingRecord = new BaseTradingRecord();
         tradingRecord.enter(0, series.getBar(0).getClosePrice(), series.numFactory().one());
 
-        var rule = new AverageTrueRangeStopGainRule(series, 3, 2.0);
+        var rules = constructRules(3, 2.0);
 
-        assertFalse(rule.isSatisfied(1, tradingRecord));
-        assertFalse(rule.isSatisfied(2, tradingRecord));
-        assertFalse(rule.isSatisfied(3, tradingRecord));
+        for (var rule : rules) {
+            assertFalse(rule.isSatisfied(1, tradingRecord));
+            assertFalse(rule.isSatisfied(2, tradingRecord));
+            assertFalse(rule.isSatisfied(3, tradingRecord));
+        }
     }
 
     @Test
     public void testEdgeCaseNoTrade() {
-        var rule = new AverageTrueRangeStopGainRule(series, 3, 2.0);
-
         var tradingRecord = new BaseTradingRecord();
+        var rules = constructRules(3, 2.0);
 
-        // No trade, so the rule should never be satisfied
-        assertFalse(rule.isSatisfied(0, tradingRecord));
-        assertFalse(rule.isSatisfied(1, tradingRecord));
-        assertFalse(rule.isSatisfied(2, tradingRecord));
+        for (var rule : rules) {
+            // No trade, so the rule should never be satisfied
+            assertFalse(rule.isSatisfied(0, tradingRecord));
+            assertFalse(rule.isSatisfied(1, tradingRecord));
+            assertFalse(rule.isSatisfied(2, tradingRecord));
+        }
+    }
+
+    @Test
+    public void serializeAndDeserialize() {
+        var rules = constructRules(3, 1.5);
+
+        for (var rule : rules) {
+            RuleSerializationRoundTripTestSupport.assertRuleRoundTrips(series, rule);
+            RuleSerializationRoundTripTestSupport.assertRuleJsonRoundTrips(series, rule);
+        }
+    }
+
+    @Test
+    public void serializeAndDeserializeWithCustomReference() {
+        Num constant = series.numFactory().numOf(20);
+        FixedIndicator<Num> reference = new FixedIndicator<>(series, constant, constant, constant, constant, constant);
+
+        var rules = Arrays.asList(new AverageTrueRangeStopGainRule(series, reference, 4, 2.25),
+                new AverageTrueRangeStopGainRule(reference, new ATRIndicator(series, 4), 2.25));
+
+        for (var rule : rules) {
+            RuleSerializationRoundTripTestSupport.assertRuleRoundTrips(series, rule);
+            RuleSerializationRoundTripTestSupport.assertRuleJsonRoundTrips(series, rule);
+        }
+    }
+
+    private List<AverageTrueRangeStopGainRule> constructRules(int atrBarCount, Number atrCoefficient) {
+        return Arrays.asList(new AverageTrueRangeStopGainRule(series, atrBarCount, atrCoefficient),
+                new AverageTrueRangeStopGainRule(series, new ClosePriceIndicator(series), atrBarCount, atrCoefficient),
+                new AverageTrueRangeStopGainRule(new ClosePriceIndicator(series), new ATRIndicator(series, atrBarCount),
+                        atrCoefficient));
+    }
+
+    @Test
+    public void constructorValidation() {
+        Num constant = series.numFactory().numOf(20);
+        FixedIndicator<Num> reference = new FixedIndicator<>(series, constant, constant, constant, constant, constant);
+        assertThrows(IllegalArgumentException.class, () -> new AverageTrueRangeStopGainRule(series, null, 4, 2.0));
+        assertThrows(IllegalArgumentException.class, () -> new AverageTrueRangeStopGainRule(series, reference, 0, 2.0));
     }
 }

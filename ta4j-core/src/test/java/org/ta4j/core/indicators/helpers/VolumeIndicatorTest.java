@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.helpers;
 
@@ -27,6 +7,7 @@ import static junit.framework.TestCase.assertEquals;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
 import org.junit.Test;
+import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
@@ -68,5 +49,80 @@ public class VolumeIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, N
         assertNumEquals(175, volumeIndicator.getValue(4));
         assertNumEquals(318, volumeIndicator.getValue(5));
         assertNumEquals(465, volumeIndicator.getValue(6));
+    }
+
+    @Test
+    public void partialSumsProduceCorrectOutputWithRandomAccessOrder() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        series.barBuilder().closePrice(0).volume(10).add();
+        series.barBuilder().closePrice(0).volume(11).add();
+        series.barBuilder().closePrice(0).volume(12).add();
+        series.barBuilder().closePrice(0).volume(13).add();
+        series.barBuilder().closePrice(0).volume(150).add();
+        series.barBuilder().closePrice(0).volume(155).add();
+        series.barBuilder().closePrice(0).volume(160).add();
+
+        var volumeIndicator = new VolumeIndicator(series, 3);
+
+        assertNumEquals(465, volumeIndicator.getValue(6));
+        assertNumEquals(36, volumeIndicator.getValue(3));
+        assertNumEquals(21, volumeIndicator.getValue(1));
+        assertNumEquals(318, volumeIndicator.getValue(5));
+        assertNumEquals(10, volumeIndicator.getValue(0));
+        assertNumEquals(175, volumeIndicator.getValue(4));
+        assertNumEquals(33, volumeIndicator.getValue(2));
+    }
+
+    @Test
+    public void singleBarAndBarCountOne() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        series.barBuilder().closePrice(100).volume(42).add();
+
+        var volumeIndicator = new VolumeIndicator(series, 1);
+        assertNumEquals(42, volumeIndicator.getValue(0));
+    }
+
+    @Test
+    public void largeWindowBarCount() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        for (int i = 0; i < 20; i++) {
+            series.barBuilder().closePrice(i).volume(i + 1).add();
+        }
+
+        var volumeIndicator = new VolumeIndicator(series, 10);
+        Num expected = numFactory.zero();
+        for (int i = 10; i <= 19; i++) {
+            expected = expected.plus(numFactory.numOf(i + 1));
+        }
+        assertNumEquals(expected, volumeIndicator.getValue(19));
+    }
+
+    @Test
+    public void warmupAtEndIndexDoesNotOverflowOnColdCache() {
+        final BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        for (int i = 0; i < 35_041; i++) {
+            series.barBuilder().closePrice(i).volume(i + 1).add();
+        }
+
+        final VolumeIndicator volumeIndicator = new VolumeIndicator(series);
+        final int endIndex = series.getEndIndex();
+
+        assertNumEquals(series.getBar(endIndex).getVolume(), volumeIndicator.getValue(endIndex));
+    }
+
+    @Test
+    public void rollingSumRespectsBeginIndexAfterConstrainedEviction() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).withMaxBarCount(3).build();
+        series.barBuilder().closePrice(0).volume(10).add(); // index 0
+        series.barBuilder().closePrice(0).volume(11).add(); // index 1
+        series.barBuilder().closePrice(0).volume(12).add(); // index 2
+        series.barBuilder().closePrice(0).volume(13).add(); // index 3 (index 0 removed)
+
+        var volumeIndicator = new VolumeIndicator(series, 2);
+
+        assertEquals(1, series.getBeginIndex());
+        assertNumEquals(11, volumeIndicator.getValue(1));
+        assertNumEquals(23, volumeIndicator.getValue(2));
+        assertNumEquals(25, volumeIndicator.getValue(3));
     }
 }

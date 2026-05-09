@@ -1,39 +1,16 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNotSame;
-import static org.junit.Assert.assertTrue;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 
+import static org.junit.Assert.*;
+import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertThrows;
 import org.junit.Before;
 import org.junit.Test;
 import org.ta4j.core.bars.TimeBarBuilder;
@@ -58,6 +35,66 @@ public class BarTest extends AbstractIndicatorTest<BarSeries, Num> {
         this.beginTime = Instant.parse("2014-06-25T00:00:00Z");
         this.endTime = Instant.parse("2014-06-25T01:00:00Z");
         this.bar = new TimeBarBuilder(this.numFactory).timePeriod(Duration.ofHours(1))
+                .endTime(this.endTime)
+                .volume(0)
+                .amount(0)
+                .build();
+    }
+
+    @Test
+    public void createBars() {
+        var barByBeginTime = new TimeBarBuilder(this.numFactory).timePeriod(Duration.ofHours(1))
+                .beginTime(this.beginTime)
+                .volume(0)
+                .amount(0)
+                .build();
+
+        var barByEndTime = new TimeBarBuilder(this.numFactory).timePeriod(Duration.ofHours(1))
+                .endTime(this.endTime)
+                .volume(0)
+                .amount(0)
+                .build();
+
+        var barByBeginTimeAndEndTime = new TimeBarBuilder(this.numFactory).timePeriod(Duration.ofHours(1))
+                .beginTime(this.beginTime)
+                .endTime(this.endTime)
+                .volume(0)
+                .amount(0)
+                .build();
+
+        var barWithoutTimePeriod = new TimeBarBuilder(this.numFactory).beginTime(this.beginTime)
+                .endTime(this.endTime)
+                .volume(0)
+                .amount(0)
+                .build();
+
+        assertEquals(barByBeginTime.getBeginTime(), barByEndTime.getBeginTime());
+        assertEquals(barByBeginTime.getEndTime(), barByEndTime.getEndTime());
+        assertEquals(barByBeginTimeAndEndTime.getTimePeriod(), barWithoutTimePeriod.getTimePeriod());
+        assertEquals(barByBeginTimeAndEndTime.getTimePeriod(), Duration.between(beginTime, endTime));
+        assertNotEquals(barByBeginTimeAndEndTime.getTimePeriod(), Duration.between(endTime, beginTime));
+        assertEquals(barWithoutTimePeriod.getTimePeriod(), Duration.between(beginTime, endTime));
+    }
+
+    @Test(expected = NullPointerException.class)
+    @SuppressWarnings("unused")
+    public void createBarsWithMissingBeginTime() {
+        // TimePeriod is not given and cannot be computed due to missing beginTime.
+        var bar = new TimeBarBuilder(this.numFactory).endTime(endTime).volume(0).amount(0).build();
+    }
+
+    @Test(expected = NullPointerException.class)
+    @SuppressWarnings("unused")
+    public void createBarsWithMissingEndTime() {
+        // TimePeriod is not given and cannot be computed due to missing endTime.
+        var bar = new TimeBarBuilder(this.numFactory).beginTime(beginTime).volume(0).amount(0).build();
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    @SuppressWarnings("unused")
+    public void createBarsWithInvalidTimePeriod() {
+        var barByBeginTime = new TimeBarBuilder(this.numFactory).timePeriod(Duration.ofHours(2))
+                .beginTime(this.beginTime)
                 .endTime(this.endTime)
                 .volume(0)
                 .amount(0)
@@ -143,5 +180,33 @@ public class BarTest extends AbstractIndicatorTest<BarSeries, Num> {
                 .build();
 
         assertEquals(bar1.hashCode(), bar2.hashCode());
+    }
+
+    @Test
+    public void numFactoryPrefersOpenPrice() {
+        var bar = new TimeBarBuilder(numFactory).timePeriod(Duration.ofSeconds(1))
+                .beginTime(Instant.now())
+                .openPrice(1)
+                .closePrice(2)
+                .build();
+
+        assertSame(bar.getOpenPrice().getClass(), bar.numFactory().one().getClass());
+    }
+
+    @Test
+    public void numFactoryFallsBackToClosePrice() {
+        var bar = new TimeBarBuilder(numFactory).timePeriod(Duration.ofSeconds(1))
+                .beginTime(Instant.now())
+                .closePrice(2)
+                .build();
+
+        assertSame(bar.getClosePrice().getClass(), bar.numFactory().one().getClass());
+    }
+
+    @Test
+    public void numFactoryThrowsWhenNoPricesAvailable() {
+        var bar = new TimeBarBuilder(numFactory).timePeriod(Duration.ofSeconds(1)).beginTime(Instant.now()).build();
+
+        assertThrows(IllegalArgumentException.class, bar::numFactory);
     }
 }

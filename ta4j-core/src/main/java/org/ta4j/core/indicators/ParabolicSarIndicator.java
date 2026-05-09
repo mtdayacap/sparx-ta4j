@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators;
 
@@ -47,7 +27,9 @@ import org.ta4j.core.num.Num;
 public class ParabolicSarIndicator extends RecursiveCachedIndicator<Num> {
 
     private final LowPriceIndicator lowPriceIndicator;
+    private final LowestValueIndicator lowestValueIndicator;
     private final HighPriceIndicator highPriceIndicator;
+    private final HighestValueIndicator highestValueIndicator;
 
     private final Num maxAcceleration;
     private final Num accelerationStart;
@@ -99,7 +81,9 @@ public class ParabolicSarIndicator extends RecursiveCachedIndicator<Num> {
     public ParabolicSarIndicator(BarSeries series, Num aF, Num maxA, Num increment) {
         super(series);
         this.lowPriceIndicator = new LowPriceIndicator(series);
+        this.lowestValueIndicator = new LowestValueIndicator(lowPriceIndicator, 2);
         this.highPriceIndicator = new HighPriceIndicator(series);
+        this.highestValueIndicator = new HighestValueIndicator(highPriceIndicator, 2);
         this.maxAcceleration = maxA;
         this.accelerationStart = aF;
         this.accelerationIncrement = increment;
@@ -149,13 +133,13 @@ public class ParabolicSarIndicator extends RecursiveCachedIndicator<Num> {
             isUpTrendMap.put(index, is_up_trend);
 
             if (is_up_trend) { // up trend
-                sar = new LowestValueIndicator(lowPriceIndicator, 2).getValue(index - 1); // put the lowest low value of
+                sar = lowestValueIndicator.getValue(index - 1); // put the lowest low value of
                 // two
-                lastExtreme.put(index, new HighestValueIndicator(highPriceIndicator, 2).getValue(index - 1));
+                lastExtreme.put(index, highestValueIndicator.getValue(index - 1));
             } else { // down trend
-                sar = new HighestValueIndicator(highPriceIndicator, 2).getValue(index - 1); // put the highest high
+                sar = highestValueIndicator.getValue(index - 1); // put the highest high
                 // value of
-                lastExtreme.put(index, new LowestValueIndicator(lowPriceIndicator, 2).getValue(index - 1));
+                lastExtreme.put(index, lowestValueIndicator.getValue(index - 1));
             }
             return sar;
         }
@@ -206,12 +190,12 @@ public class ParabolicSarIndicator extends RecursiveCachedIndicator<Num> {
         }
 
         if (is_up_trend) {
-            Num lowestPriceOfTwoPreviousBars = new LowestValueIndicator(lowPriceIndicator, 2).getValue(index - 1);
+            Num lowestPriceOfTwoPreviousBars = lowestValueIndicator.getValue(index - 1);
             if (sar.isGreaterThan(lowestPriceOfTwoPreviousBars)) {
                 sar = lowestPriceOfTwoPreviousBars;
             }
         } else {
-            Num highestPriceOfTwoPreviousBars = new HighestValueIndicator(highPriceIndicator, 2).getValue(index - 1);
+            Num highestPriceOfTwoPreviousBars = highestValueIndicator.getValue(index - 1);
             if (sar.isLessThan(highestPriceOfTwoPreviousBars)) {
                 sar = highestPriceOfTwoPreviousBars;
             }
@@ -222,7 +206,7 @@ public class ParabolicSarIndicator extends RecursiveCachedIndicator<Num> {
 
     @Override
     public int getCountOfUnstableBars() {
-        return 0;
+        return Math.max(lowestValueIndicator.getCountOfUnstableBars(), highestValueIndicator.getCountOfUnstableBars());
     }
 
     private boolean defineUpTrend(final int barIndex) {

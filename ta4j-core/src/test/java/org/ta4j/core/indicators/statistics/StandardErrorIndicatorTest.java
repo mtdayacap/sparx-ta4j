@@ -1,25 +1,5 @@
 /*
- * The MIT License (MIT)
- *
- * Copyright (c) 2017-2024 Ta4j Organization & respective
- * authors (see AUTHORS)
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy of
- * this software and associated documentation files (the "Software"), to deal in
- * the Software without restriction, including without limitation the rights to
- * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
- * the Software, and to permit persons to whom the Software is furnished to do so,
- * subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
- * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
- * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
- * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ * SPDX-License-Identifier: MIT
  */
 package org.ta4j.core.indicators.statistics;
 
@@ -72,5 +52,36 @@ public class StandardErrorIndicatorTest extends AbstractIndicatorTest<Indicator<
         var se = new StandardErrorIndicator(new ClosePriceIndicator(data), 1);
         assertNumEquals(0, se.getValue(1));
         assertNumEquals(0, se.getValue(3));
+    }
+
+    @Test
+    public void sampleStandardErrorCanBeRequestedExplicitly() {
+        var se = StandardErrorIndicator.ofSample(new ClosePriceIndicator(data), 5);
+
+        assertNumEquals(0, se.getValue(0));
+        assertNumEquals(5.0000, se.getValue(1));
+        assertNumEquals(5.7735, se.getValue(2));
+        assertNumEquals(6.4550, se.getValue(3));
+        assertNumEquals(7.0711, se.getValue(4));
+        assertNumEquals(5.0990, se.getValue(5));
+        assertNumEquals(3.1623, se.getValue(6));
+        assertNumEquals(2.4495, se.getValue(7));
+        assertNumEquals(2.4495, se.getValue(8));
+        assertNumEquals(3.1623, se.getValue(9));
+        assertNumEquals(5.0990, se.getValue(10));
+        assertNumEquals(7.0711, se.getValue(11));
+    }
+
+    @Test
+    public void nonPositiveBarCountFallsBackToOne() {
+        var closePrice = new ClosePriceIndicator(data);
+        var withOne = StandardErrorIndicator.ofPopulation(closePrice, 1);
+        var withZero = StandardErrorIndicator.ofPopulation(closePrice, 0);
+        var withNegative = StandardErrorIndicator.ofPopulation(closePrice, -3);
+
+        for (int i = 0; i <= 11; i++) {
+            assertNumEquals(withOne.getValue(i), withZero.getValue(i), 1.0e-12);
+            assertNumEquals(withOne.getValue(i), withNegative.getValue(i), 1.0e-12);
+        }
     }
 }
