@@ -1,12 +1,15 @@
 /*
  * SPDX-License-Identifier: MIT
  */
+
 package org.ta4j.core.indicators;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.averages.SMAIndicator;
@@ -14,6 +17,7 @@ import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.num.NumFactory;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class DistanceFromMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num> {
     private BarSeries data;
@@ -22,7 +26,7 @@ public class DistanceFromMAIndicatorTest extends AbstractIndicatorTest<Indicator
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         data = new MockBarSeriesBuilder().withNumFactory(numFactory)
                 .withData(10, 15, 20, 18, 17, 18, 15, 12, 10, 8, 5, 2)
@@ -38,9 +42,28 @@ public class DistanceFromMAIndicatorTest extends AbstractIndicatorTest<Indicator
         assertNumEquals(-0.1, distanceFromMAIndicator.getValue(6));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
+    public void explicitSeriesBindingReadsClosePricesFromExplicitSeries() {
+        BarSeries explicitSeries = new MockBarSeriesBuilder().withNumFactory(numFactory)
+                .withData(20, 10)
+                .withName("explicit")
+                .build();
+        BarSeries maSeries = new MockBarSeriesBuilder().withNumFactory(numFactory)
+                .withData(10, 30)
+                .withName("ma")
+                .build();
+        SMAIndicator ma = new SMAIndicator(new ClosePriceIndicator(maSeries), 2);
+        DistanceFromMAIndicator indicator = new DistanceFromMAIndicator(explicitSeries, ma);
+
+        assertNumEquals(numOf(-1).dividedBy(numOf(2)), indicator.getValue(1));
+        assertEquals("explicit", indicator.getBarSeries().getName());
+    }
+
+    @Test
     public void DistanceFromIllegalMovingAverage() {
-        ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(data);
-        new DistanceFromMAIndicator(data, closePriceIndicator);
+        assertThrows(IllegalArgumentException.class, () -> {
+            ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(data);
+            new DistanceFromMAIndicator(data, closePriceIndicator);
+        });
     }
 }

@@ -5,8 +5,8 @@ package org.ta4j.core.indicators.helpers;
 
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -23,7 +23,7 @@ public class CloseLocationValueIndicatorTest extends AbstractIndicatorTest<Indic
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         series = new MockBarSeriesBuilder().build();
         series.barBuilder().openPrice(10).closePrice(18).highPrice(20).lowPrice(10).add();
@@ -33,7 +33,7 @@ public class CloseLocationValueIndicatorTest extends AbstractIndicatorTest<Indic
         series.barBuilder().openPrice(11).closePrice(12).highPrice(12).lowPrice(10).add();
         series.barBuilder().openPrice(10).closePrice(10).highPrice(10).lowPrice(10).add();
         series.barBuilder().openPrice(11).closePrice(12).highPrice(12).lowPrice(10).add();
-        series.barBuilder().openPrice(11).closePrice(120).highPrice(140).lowPrice(100).add();
+        series.barBuilder().openPrice(120).closePrice(120).highPrice(140).lowPrice(100).add();
     }
 
     @Test
@@ -52,5 +52,13 @@ public class CloseLocationValueIndicatorTest extends AbstractIndicatorTest<Indic
         assertNumEquals(NaN.NaN, clv.getValue(5));
         assertNumEquals(1, clv.getValue(6));
         assertNumEquals(0, clv.getValue(7));
+    }
+
+    @Test
+    public void returnsNaNWhenHighIsUndefined() {
+        series.barBuilder().openPrice(10).closePrice(10).highPrice(NaN.NaN).lowPrice(10).add();
+        CloseLocationValueIndicator clv = new CloseLocationValueIndicator(series);
+
+        assertNumEquals(NaN.NaN, clv.getValue(8));
     }
 }

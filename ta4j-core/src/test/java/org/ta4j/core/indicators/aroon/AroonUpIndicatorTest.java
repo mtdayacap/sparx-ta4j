@@ -3,15 +3,15 @@
  */
 package org.ta4j.core.indicators.aroon;
 
-import static junit.framework.TestCase.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 import static org.ta4j.core.num.NaN.NaN;
 
 import java.time.Duration;
 import java.time.Instant;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
@@ -20,7 +20,7 @@ public class AroonUpIndicatorTest {
 
     private BarSeries data;
 
-    @Before
+    @BeforeEach
     public void init() {
         // FB, daily, Sept 19, 2017
         data = new MockBarSeriesBuilder().build();
@@ -38,7 +38,7 @@ public class AroonUpIndicatorTest {
         data.barBuilder().openPrice(171.80).highPrice(173.31).lowPrice(170.27).closePrice(173.21).volume(0).add();
         data.barBuilder().openPrice(173.09).highPrice(173.49).lowPrice(170.80).closePrice(170.95).volume(0).add();
         data.barBuilder().openPrice(172.41).highPrice(173.89).lowPrice(172.20).closePrice(173.51).volume(0).add();
-        data.barBuilder().openPrice(173.87).highPrice(174.17).lowPrice(175.00).closePrice(172.96).volume(0).add();
+        data.barBuilder().openPrice(173.87).highPrice(175.00).lowPrice(172.96).closePrice(174.17).volume(0).add();
         data.barBuilder().openPrice(173.00).highPrice(173.17).lowPrice(172.06).closePrice(173.05).volume(0).add();
         data.barBuilder().openPrice(172.26).highPrice(172.28).lowPrice(170.50).closePrice(170.96).volume(0).add();
         data.barBuilder().openPrice(170.88).highPrice(172.34).lowPrice(170.26).closePrice(171.64).volume(0).add();

@@ -17,12 +17,30 @@ import static org.ta4j.core.num.NaN.NaN;
  * invalid data is encountered. When a NaN value is detected, it is returned
  * immediately. If a previous value is NaN, the indicator resets to the current
  * value to allow graceful recovery.
+ *
+ * <p>
+ * On a bounded (moving) series the recurrence continues across head advances:
+ * retained cached values are full-history values, and each appended bar extends
+ * the chain from its cached predecessor, so results match an unbounded series
+ * at a per-bar cost independent of the maximum bar count. The recursion is
+ * re-seeded at the retained head only when no cached predecessor exists (for
+ * example a fresh indicator, or a read after the cache was invalidated); in
+ * that case the declared unstable bars after that head are warm-up values
+ * ({@code NaN}), exactly as on an unbounded series starting there. Warm-up is
+ * counted from where the chain was seeded, so a continued chain keeps its
+ * full-history warm-up even when the window is shorter than the warm-up.
  */
 public abstract class AbstractEMAIndicator extends RecursiveCachedIndicator<Num> {
 
     private final Indicator<Num> indicator;
     private final int barCount;
-    private final Num multiplier;
+    private final transient Num multiplier;
+    /**
+     * First index of the live recurrence: the retained head at which the chain was
+     * last seeded because no cached predecessor existed. Warm-up is measured from
+     * here, so a chain continued across head advances keeps full-history warm-up.
+     */
+    private volatile transient int chainStartIndex = getBarSeries().getBeginIndex();
 
     /**
      * Constructor.
@@ -40,26 +58,66 @@ public abstract class AbstractEMAIndicator extends RecursiveCachedIndicator<Num>
 
     @Override
     protected Num calculate(int index) {
-        // Return NaN during unstable period
-        int beginIndex = getBarSeries().getBeginIndex();
-        int unstableBars = getCountOfUnstableBars();
-        if (index < beginIndex + unstableBars) {
+        while (true) {
+            int beginIndex = getBarSeries().getBeginIndex();
+            if (beginIndex < 0) {
+                // Empty series: there is no bar to seed from or recurse to.
+                return NaN;
+            }
+            // CachedIndicator maps unavailable history to calculate(0). Serve the
+            // first available bar's value: the retained recurrence when the chain
+            // continued past the head, otherwise its seed. calculate(beginIndex)
+            // never reads a predecessor, so this cannot recurse back here.
+            if (index < beginIndex) {
+                return getValue(beginIndex);
+            }
+
+            Num value = index == beginIndex ? seed(index) : continueChain(index);
+            if (getBarSeries().getBeginIndex() == beginIndex) {
+                return value;
+            }
+            // The head advanced while this value was computed, so its predecessor
+            // or source may have been read from bars that are now removed. Retry
+            // against the new head: the value is then either a continuation or a
+            // re-seed at that head, never a mix of the two.
+        }
+    }
+
+    private Num seed(int index) {
+        // No retained predecessor: the chain is (re)seeded at the retained head.
+        chainStartIndex = index;
+        if (getCountOfUnstableBars() > 0) {
+            return NaN;
+        }
+        Num current = indicator.getValue(index);
+        // Seed the recursion through the initialValue extension point instead of
+        // chasing getValue(index - 1) into removed history or self-recursion.
+        return Num.isFinite(current) ? initialValue(index, current) : NaN;
+    }
+
+    private Num continueChain(int index) {
+        // Resolve the predecessor first: when it is not cached the recursion walks
+        // back to the retained head and re-seeds there, which updates the chain
+        // start used by the warm-up check below.
+        Num prevValue = getValue(index - 1);
+        if (index < (long) chainStartIndex + getCountOfUnstableBars()) {
+            // Warm-up is counted from where the chain was seeded, not from the
+            // current head: a chain carried across head advances keeps its
+            // full-history warm-up even when the window is shorter than it.
             return NaN;
         }
 
         Num current = indicator.getValue(index);
 
         // Check for NaN in current value
-        if (Num.isNaNOrNull(current)) {
+        if (!Num.isFinite(current)) {
             return NaN;
         }
 
-        // Get previous value and check for NaN
-        Num prevValue = getValue(index - 1);
-        if (Num.isNaNOrNull(prevValue)) {
+        if (!Num.isFinite(prevValue)) {
             // Graceful recovery: reset to current value when previous is NaN
             // This prevents contamination of future values
-            return current;
+            return initialValue(index, current);
         }
 
         // Standard EMA calculation
@@ -74,4 +132,17 @@ public abstract class AbstractEMAIndicator extends RecursiveCachedIndicator<Num>
     public int getBarCount() {
         return barCount;
     }
+
+    /**
+     * Returns the first value used after warm-up or after a NaN reset.
+     *
+     * @param index   current index
+     * @param current current source value
+     * @return initial EMA value
+     * @since 0.22.9
+     */
+    protected Num initialValue(int index, Num current) {
+        return current;
+    }
+
 }

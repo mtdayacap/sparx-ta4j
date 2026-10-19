@@ -3,10 +3,15 @@
  */
 package org.ta4j.core.indicators.averages;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -23,7 +28,7 @@ public class HMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num>
         super(numFunction);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         data = new MockBarSeriesBuilder().withNumFactory(numFactory)
                 .withData(84.53, 87.39, 84.55, 82.83, 82.58, 83.74, 83.33, 84.57, 86.98, 87.10, 83.11, 83.60, 83.66,
@@ -47,6 +52,14 @@ public class HMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num>
         assertNumEquals(75.5363, hma.getValue(18));
         assertNumEquals(75.1713, hma.getValue(19));
         assertNumEquals(75.3597, hma.getValue(20));
+    }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+
+        return List.of(serializationFixture(series, new HMAIndicator(close, 9), stableIndexes(series)));
     }
 
 }

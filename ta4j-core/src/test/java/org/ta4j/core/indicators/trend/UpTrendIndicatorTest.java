@@ -3,10 +3,15 @@
  */
 package org.ta4j.core.indicators.trend;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
 
-import org.junit.Test;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -45,4 +50,11 @@ public class UpTrendIndicatorTest extends AbstractIndicatorTest<Indicator<Boolea
 
         assertEquals(expectedUnstableBars, indicator.getCountOfUnstableBars());
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        return List.of(serializationFixture(series, new UpTrendIndicator(series, 7, 20.0), stableIndexes(series)));
+    }
+
 }

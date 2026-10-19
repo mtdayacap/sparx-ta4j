@@ -4,15 +4,15 @@
 package org.ta4j.core.indicators.macd;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseBarSeriesBuilder;
 import org.ta4j.core.Indicator;
@@ -41,7 +41,7 @@ public class MACDVIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Nu
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         this.series = buildSeries(90);
     }
@@ -52,6 +52,7 @@ public class MACDVIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Nu
         assertThrows(IllegalArgumentException.class, () -> new MACDVIndicator(new ClosePriceIndicator(series), 0, 10));
         assertThrows(IllegalArgumentException.class,
                 () -> new MACDVIndicator(new ClosePriceIndicator(series), 5, 10, 0));
+        assertThrows(NullPointerException.class, () -> new MACDVIndicator((Indicator<Num>) null));
     }
 
     @Test
@@ -276,4 +277,47 @@ public class MACDVIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Nu
         }
         return result;
     }
+
+    /**
+     * MACD-V lazily creates VWMA and ATR sub-indicators that are not
+     * constructor-registered dependencies. A rebaselining source inside those
+     * chains (the TR inside the ATRs discards the whole cache on head advance) must
+     * still propagate a whole-cache discard into MACD-V, so cached values above its
+     * own unstable-range floor are recomputed after the head advance.
+     */
+    @Test
+    public void headAdvanceDiscardsWholeCacheThroughDerivedAtrChain() {
+        BarSeries bounded = buildSeries(200);
+        bounded.setMaximumBarCount(100);
+        CountingMacdvIndicator indicator = new CountingMacdvIndicator(new ClosePriceIndicator(bounded));
+        int probeIndex = bounded.getBeginIndex() + 60;
+
+        indicator.getValue(probeIndex);
+        int calculationsBefore = indicator.calculations();
+
+        bounded.setMaximumBarCount(80);
+        indicator.getValue(probeIndex);
+
+        assertThat(indicator.calculations()).isGreaterThan(calculationsBefore);
+    }
+
+    private static final class CountingMacdvIndicator extends MACDVIndicator {
+
+        private final AtomicInteger calculations = new AtomicInteger();
+
+        CountingMacdvIndicator(Indicator<Num> priceIndicator) {
+            super(priceIndicator);
+        }
+
+        @Override
+        protected Num calculate(int index) {
+            calculations.incrementAndGet();
+            return super.calculate(index);
+        }
+
+        int calculations() {
+            return calculations.get();
+        }
+    }
+
 }

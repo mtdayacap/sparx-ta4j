@@ -3,9 +3,14 @@
  */
 package org.ta4j.core.indicators.keltner;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -22,7 +27,7 @@ public class KeltnerChannelLowerIndicatorTest extends AbstractIndicatorTest<Indi
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         data = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
         data.barBuilder().openPrice(11577.43).closePrice(11670.75).highPrice(11711.47).lowPrice(11577.35).add();
@@ -109,4 +114,15 @@ public class KeltnerChannelLowerIndicatorTest extends AbstractIndicatorTest<Indi
             assertThat(restored.getValue(i)).isEqualTo(indicator.getValue(i));
         }
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+
+        return List.of(serializationFixture(series,
+                new KeltnerChannelLowerIndicator(new KeltnerChannelMiddleIndicator(close, 7), 1.5, 6),
+                stableIndexes(series)));
+    }
+
 }

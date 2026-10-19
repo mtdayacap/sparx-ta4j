@@ -5,9 +5,10 @@ package ta4jexamples.charting.display;
 
 import org.jfree.chart.ChartFactory;
 import org.jfree.chart.JFreeChart;
-import org.junit.Assume;
+import org.junit.jupiter.api.Assumptions;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 import java.awt.Dimension;
@@ -142,8 +143,9 @@ class SwingChartDisplayerTest {
     }
 
     @Test
+    @Tag("requires-display")
     void testDisplayCreatesNonFocusableWindowWhenEnabled() {
-        Assume.assumeFalse("Headless environment", GraphicsEnvironment.isHeadless());
+        Assumptions.assumeFalse(GraphicsEnvironment.isHeadless(), "Headless environment");
 
         String title = "Focusability Test " + UUID.randomUUID();
         System.clearProperty(SwingChartDisplayer.DISABLE_DISPLAY_PROPERTY);
@@ -163,19 +165,17 @@ class SwingChartDisplayerTest {
     /**
      * Tests that display gracefully handles headless environments.
      * <p>
-     * <b>Note:</b> This test is intentionally skipped when running in a
-     * non-headless environment (e.g., when a display is available). The test uses
-     * {@code Assume.assumeTrue()} to skip when a display is present, as it
-     * specifically tests behavior in headless environments where GUI operations
+     * <b>Note:</b> This test is tagged {@code requires-headless} because it
+     * specifically tests behavior in no-display environments where GUI operations
      * should fail gracefully.
      * <p>
-     * This skip is expected and intentional - the test validates headless
-     * environment handling, which only applies when no display is available.
+     * Select the tag explicitly when validating headless environment handling.
      */
     @Test
+    @Tag("requires-headless")
     void testDisplayHandlesHeadlessEnvironment() {
         // This test only runs in headless environments
-        Assume.assumeTrue("Test requires headless environment", GraphicsEnvironment.isHeadless());
+        Assumptions.assumeTrue(GraphicsEnvironment.isHeadless(), "Test requires headless environment");
 
         // Clear the disable display property so we can test actual headless behavior
         System.clearProperty(SwingChartDisplayer.DISABLE_DISPLAY_PROPERTY);
@@ -371,9 +371,10 @@ class SwingChartDisplayerTest {
     }
 
     @Test
+    @Tag("requires-headless")
     void testDisplayHandlesCascadingInHeadlessEnvironment() {
         // This test only runs in headless environments
-        Assume.assumeTrue("Test requires headless environment", GraphicsEnvironment.isHeadless());
+        Assumptions.assumeTrue(GraphicsEnvironment.isHeadless(), "Test requires headless environment");
 
         // Clear the disable display property so we can test actual headless behavior
         System.clearProperty(SwingChartDisplayer.DISABLE_DISPLAY_PROPERTY);

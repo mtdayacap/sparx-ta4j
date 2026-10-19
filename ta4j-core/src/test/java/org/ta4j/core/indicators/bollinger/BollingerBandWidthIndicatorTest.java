@@ -3,10 +3,11 @@
  */
 package org.ta4j.core.indicators.bollinger;
 
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.indicators.averages.SMAIndicator;
@@ -24,7 +25,7 @@ public class BollingerBandWidthIndicatorTest extends AbstractIndicatorTest<Indic
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         var data = new MockBarSeriesBuilder().withNumFactory(numFactory)
                 .withData(10, 12, 15, 14, 17, 20, 21, 20, 20, 19, 20, 17, 12, 12, 9, 8, 9, 10, 9, 10)
@@ -64,5 +65,25 @@ public class BollingerBandWidthIndicatorTest extends AbstractIndicatorTest<Indic
         assertNumEquals(56.5194, bandwidth.getValue(17));
         assertNumEquals(28.1091, bandwidth.getValue(18));
         assertNumEquals(32.5362, bandwidth.getValue(19));
+    }
+
+    @Test
+    public void bollingerWrappersCanCopyConfigurationWithoutSharingWrapperInstances() {
+        SMAIndicator sma = new SMAIndicator(closePrice, 5);
+        StandardDeviationIndicator standardDeviation = new StandardDeviationIndicator(closePrice, 5);
+        BollingerBandsMiddleIndicator middle = new BollingerBandsMiddleIndicator(sma);
+        BollingerBandsUpperIndicator upper = new BollingerBandsUpperIndicator(middle, standardDeviation);
+        BollingerBandsLowerIndicator lower = new BollingerBandsLowerIndicator(middle, standardDeviation);
+
+        BollingerBandsMiddleIndicator middleCopy = middle.copy();
+        BollingerBandsUpperIndicator upperCopy = upper.copy();
+        BollingerBandsLowerIndicator lowerCopy = lower.copy();
+
+        assertNotSame(middle, middleCopy);
+        assertNotSame(upper, upperCopy);
+        assertNotSame(lower, lowerCopy);
+        assertNumEquals(middle.getValue(10), middleCopy.getValue(10));
+        assertNumEquals(upper.getValue(10), upperCopy.getValue(10));
+        assertNumEquals(lower.getValue(10), lowerCopy.getValue(10));
     }
 }

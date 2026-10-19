@@ -3,37 +3,50 @@
  */
 package org.ta4j.core.rules;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.Position;
 import org.ta4j.core.Trade;
+import org.ta4j.core.TraceTestLogger;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
+import org.ta4j.core.mocks.MockIndicator;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.num.NumFactory;
+import org.ta4j.core.num.NaN;
 
 public class FixedAmountStopGainRuleTest extends AbstractIndicatorTest<BarSeries, Num> {
 
     private ClosePriceIndicator closePrice;
 
+    private TraceTestLogger ruleTraceTestLogger;
+
     public FixedAmountStopGainRuleTest(NumFactory numFactory) {
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         closePrice = new ClosePriceIndicator(new MockBarSeriesBuilder().withNumFactory(numFactory)
                 .withData(100, 105, 110, 120, 100, 150, 110, 100)
                 .build());
+        ruleTraceTestLogger = new TraceTestLogger();
+        ruleTraceTestLogger.open();
+    }
+
+    @AfterEach
+    public void tearDownLogger() {
+        ruleTraceTestLogger.close();
     }
 
     @Test
@@ -91,5 +104,20 @@ public class FixedAmountStopGainRuleTest extends AbstractIndicatorTest<BarSeries
         assertThrows(IllegalArgumentException.class, () -> new FixedAmountStopGainRule(closePrice, numFactory.zero()));
         assertThrows(IllegalArgumentException.class,
                 () -> new FixedAmountStopGainRule(closePrice, numFactory.minusOne()));
+    }
+
+    @Test
+    public void traceLoggingReportsUnavailableCurrentPrice() {
+        var series = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(100, 105, 110).build();
+        var nanClose = new MockIndicator(series, 0, numFactory.numOf(100), NaN.NaN, numFactory.numOf(110));
+        var tradingRecord = new BaseTradingRecord(Trade.TradeType.BUY);
+        tradingRecord.enter(0, numFactory.numOf(100), numFactory.one());
+        var rule = new FixedAmountStopGainRule(nanClose, numFactory.numOf(5));
+
+        ruleTraceTestLogger.clear();
+        assertFalse(rule.isSatisfied(1, tradingRecord));
+
+        assertTrue(ruleTraceTestLogger.getLogOutput().contains("reason=priceUnavailable"),
+                "Stop trace should report the unavailable current price");
     }
 }

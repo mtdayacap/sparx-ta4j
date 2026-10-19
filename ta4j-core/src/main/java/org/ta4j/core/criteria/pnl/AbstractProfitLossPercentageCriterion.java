@@ -10,6 +10,7 @@ import org.ta4j.core.Position;
 import org.ta4j.core.Trade;
 import org.ta4j.core.TradingRecord;
 import org.ta4j.core.criteria.AbstractAnalysisCriterion;
+import org.ta4j.core.criteria.ReturnCriterion;
 import org.ta4j.core.criteria.ReturnRepresentation;
 import org.ta4j.core.criteria.ReturnRepresentationPolicy;
 import org.ta4j.core.num.Num;
@@ -24,7 +25,8 @@ import org.ta4j.core.num.NumFactory;
  * neutral value of {@code 0.0}). The representation is applied before values
  * are returned to callers.
  */
-public abstract class AbstractProfitLossPercentageCriterion extends AbstractAnalysisCriterion {
+public abstract class AbstractProfitLossPercentageCriterion extends AbstractAnalysisCriterion
+        implements ReturnCriterion {
 
     /**
      * Output representation used for this criterion.
@@ -74,14 +76,10 @@ public abstract class AbstractProfitLossPercentageCriterion extends AbstractAnal
         var numFactory = series.numFactory();
         var zero = numFactory.zero();
 
-        var totalProfit = tradingRecord.getPositions()
-                .stream()
-                .filter(Position::isClosed)
-                .map(this::profit)
-                .reduce(zero, Num::plus);
+        var positions = tradingRecord.getContainedPositions(series);
+        var totalProfit = positions.stream().filter(Position::isClosed).map(this::profit).reduce(zero, Num::plus);
 
-        var totalEntryPrice = tradingRecord.getPositions()
-                .stream()
+        var totalEntryPrice = positions.stream()
                 .filter(Position::isClosed)
                 .map(Position::getEntry)
                 .map(Trade::getValue)

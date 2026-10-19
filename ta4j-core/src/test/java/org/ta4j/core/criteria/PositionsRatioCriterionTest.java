@@ -3,17 +3,22 @@
  */
 package org.ta4j.core.criteria;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.AnalysisCriterion;
 import org.ta4j.core.AnalysisCriterion.PositionFilter;
+import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Position;
 import org.ta4j.core.Trade;
 import org.ta4j.core.TradingRecord;
+import org.ta4j.core.analysis.AnalysisContext;
+import org.ta4j.core.analysis.AnalysisContext.PositionInclusionPolicy;
+import org.ta4j.core.analysis.AnalysisWindow;
+import org.ta4j.core.analysis.cost.ZeroCostModel;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.NumFactory;
 
@@ -21,6 +26,15 @@ public class PositionsRatioCriterionTest extends AbstractCriterionTest {
 
     public PositionsRatioCriterionTest(NumFactory numFactory) {
         super(params -> new PositionsRatioCriterion((PositionFilter) params[0]), numFactory);
+    }
+
+    @Test
+    public void factoriesCreateWinningAndLosingCriteria() {
+        AnalysisCriterion winning = PositionsRatioCriterion.winningPositionsRatioCriterion();
+        AnalysisCriterion losing = PositionsRatioCriterion.losingPositionsRatioCriterion();
+
+        assertTrue(winning.betterThan(numOf(2), numOf(1)));
+        assertTrue(losing.betterThan(numOf(1), numOf(2)));
     }
 
     @Test
@@ -103,4 +117,108 @@ public class PositionsRatioCriterionTest extends AbstractCriterionTest {
                 getCriterion(PositionFilter.LOSS), 0);
     }
 
+    @Test
+    public void positionLevelResultFollowsReturnRepresentation() {
+        var series = new MockBarSeriesBuilder().withNumFactory(numFactory)
+                .withData(100d, 95d, 102d, 105d, 97d, 113d)
+                .build();
+        // Single winning position: 102/95 > 1
+        Position winningPosition = new Position(Trade.buyAt(1, series), Trade.sellAt(2, series));
+        TradingRecord recordWithOneWinningPosition = new BaseTradingRecord(Trade.buyAt(1, series),
+                Trade.sellAt(2, series));
+
+        // MULTIPLICATIVE: 1 + 1 = 2.0, equal to the record-level result for the same
+        // position
+        var multiplicativeCriterion = new PositionsRatioCriterion(PositionFilter.PROFIT,
+                ReturnRepresentation.MULTIPLICATIVE);
+        var positionResult = multiplicativeCriterion.calculate(series, winningPosition);
+        assertNumEquals(numOf(2), positionResult);
+        assertNumEquals(multiplicativeCriterion.calculate(series, recordWithOneWinningPosition), positionResult);
+
+        // PERCENTAGE: 1 * 100 = 100.0, equal to the record-level result
+        var percentageCriterion = new PositionsRatioCriterion(PositionFilter.PROFIT, ReturnRepresentation.PERCENTAGE);
+        var positionPercentage = percentageCriterion.calculate(series, winningPosition);
+        assertNumEquals(numOf(100), positionPercentage);
+        assertNumEquals(percentageCriterion.calculate(series, recordWithOneWinningPosition), positionPercentage);
+
+        // DECIMAL keeps returning the raw ratio (0 or 1)
+        var decimalCriterion = new PositionsRatioCriterion(PositionFilter.PROFIT, ReturnRepresentation.DECIMAL);
+        assertNumEquals(numOf(1), decimalCriterion.calculate(series, winningPosition));
+        assertNumEquals(numOf(0),
+                decimalCriterion.calculate(series, new Position(Trade.buyAt(0, series), Trade.sellAt(1, series))));
+
+        // Losing position under MULTIPLICATIVE: 1 + 0 = 1.0
+        var losingPosition = new Position(Trade.buyAt(0, series), Trade.sellAt(1, series));
+        assertNumEquals(numOf(1), multiplicativeCriterion.calculate(series, losingPosition));
+
+        // LOG representation: winning ratio 1 -> ln(1 + 1) = ln(2); losing ratio 0 ->
+        // ln(1 + 0) = 0
+        var logCriterion = new PositionsRatioCriterion(PositionFilter.PROFIT, ReturnRepresentation.LOG);
+        assertNumEquals(Math.log(2), logCriterion.calculate(series, winningPosition));
+        assertNumEquals(numOf(0), logCriterion.calculate(series, losingPosition));
+        assertNumEquals(logCriterion.calculate(series, recordWithOneWinningPosition),
+                logCriterion.calculate(series, winningPosition));
+    }
+
+    @Test
+    public void boundedRecordUsesSelectedPopulation() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory)
+                .withData(100, 100, 110, 100, 120, 100, 95, 100, 110, 130)
+                .build();
+        TradingRecord record = boundedRecord(series, 2, 8);
+
+        // Only profits [20, -5] are selected: one winner among two positions.
+        assertNumEquals(0.5, getCriterion(PositionFilter.PROFIT).calculate(series, record));
+        assertNumEquals(0.5, getCriterion(PositionFilter.LOSS).calculate(series, record));
+    }
+
+    @Test
+    public void directBoundsAndAnalysisWindowSelectTheSamePopulation() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory)
+                .withData(100, 100, 110, 100, 120, 100, 95, 100, 110, 130)
+                .build();
+        TradingRecord bounded = boundedRecord(series, 2, 8);
+        TradingRecord unbounded = new BaseTradingRecord(Trade.TradeType.BUY, new ZeroCostModel(), new ZeroCostModel());
+        for (Position position : bounded.getPositions()) {
+            unbounded.operate(position.getEntry());
+            unbounded.operate(position.getExit());
+        }
+        AnalysisContext context = AnalysisContext.defaults()
+                .withPositionInclusionPolicy(PositionInclusionPolicy.FULLY_CONTAINED);
+
+        // The ratio composes a winner count with the population size; both must see
+        // the same positions whether the range comes from record bounds or a window.
+        for (PositionFilter filter : PositionFilter.values()) {
+            AnalysisCriterion criterion = getCriterion(filter);
+            assertNumEquals(criterion.calculate(series, bounded),
+                    criterion.calculate(series, unbounded, AnalysisWindow.barRange(2, 8), context));
+        }
+    }
+
+    @Test
+    public void emptySelectedPopulationPreservesEmptyRecordResult() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory)
+                .withData(100, 100, 110, 100, 120, 100, 95, 100, 110, 130)
+                .build();
+        TradingRecord record = boundedRecord(series, 8, 8);
+
+        // The source retains four closed positions, but none belongs to [8, 8].
+        assertFalse(record.getPositions().isEmpty());
+        assertTrue(getCriterion(PositionFilter.PROFIT).calculate(series, record).isNaN());
+        assertTrue(getCriterion(PositionFilter.LOSS).calculate(series, record).isNaN());
+    }
+
+    private TradingRecord boundedRecord(BarSeries series, int startIndex, int endIndex) {
+        TradingRecord record = new BaseTradingRecord(Trade.TradeType.BUY, startIndex, endIndex, new ZeroCostModel(),
+                new ZeroCostModel());
+        record.operate(Trade.buyAt(0, series, numFactory.one()));
+        record.operate(Trade.sellAt(2, series, numFactory.one()));
+        record.operate(Trade.buyAt(3, series, numFactory.one()));
+        record.operate(Trade.sellAt(4, series, numFactory.one()));
+        record.operate(Trade.buyAt(5, series, numFactory.one()));
+        record.operate(Trade.sellAt(6, series, numFactory.one()));
+        record.operate(Trade.buyAt(7, series, numFactory.one()));
+        record.operate(Trade.sellAt(9, series, numFactory.one()));
+        return record;
+    }
 }

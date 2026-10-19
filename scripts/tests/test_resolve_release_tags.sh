@@ -34,7 +34,7 @@ expect_output_value() {
 }
 
 run_test() {
-  TMP="$(mktemp -d)"
+  TMP="$(mktemp -d "${TMPDIR:-/tmp}/ta4j-resolve-tags.XXXXXX")"
   mkdir -p "$TMP/scripts"
   cp "$SCRIPT" "$TMP/scripts/resolve-release-tags.sh"
   chmod +x "$TMP/scripts/resolve-release-tags.sh"
@@ -43,6 +43,7 @@ run_test() {
   git init -q -b master
   git config user.name "Test User"
   git config user.email "test@example.com"
+  git config core.autocrlf false
 }
 
 finish_test() {

@@ -3,12 +3,12 @@
  */
 package org.ta4j.core.bars;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.io.StringWriter;
@@ -23,7 +23,7 @@ import org.apache.logging.log4j.core.appender.WriterAppender;
 import org.apache.logging.log4j.core.config.Configuration;
 import org.apache.logging.log4j.core.config.LoggerConfig;
 import org.apache.logging.log4j.core.layout.PatternLayout;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseBar;
@@ -337,6 +337,7 @@ public class TimeBarBuilderTest extends AbstractIndicatorTest<BarSeries, Num> {
         Configuration config = loggerContext.getConfiguration();
         LoggerConfig loggerConfig = config.getLoggerConfig(TimeBarBuilder.class.getName());
         Level originalLevel = loggerConfig.getLevel();
+        boolean originalAdditivity = loggerConfig.isAdditive();
 
         StringWriter logOutput = new StringWriter();
         PatternLayout layout = PatternLayout.newBuilder().withPattern("%msg%n").build();
@@ -349,6 +350,7 @@ public class TimeBarBuilderTest extends AbstractIndicatorTest<BarSeries, Num> {
 
         loggerConfig.addAppender(appender, Level.WARN, null);
         loggerConfig.setLevel(Level.WARN);
+        loggerConfig.setAdditive(false);
         loggerContext.updateLoggers();
 
         try {
@@ -358,6 +360,7 @@ public class TimeBarBuilderTest extends AbstractIndicatorTest<BarSeries, Num> {
             loggerConfig.removeAppender(appender.getName());
             appender.stop();
             loggerConfig.setLevel(originalLevel);
+            loggerConfig.setAdditive(originalAdditivity);
             loggerContext.updateLoggers();
         }
 

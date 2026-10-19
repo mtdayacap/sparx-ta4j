@@ -3,6 +3,12 @@
  */
 package org.ta4j.core.indicators.volume;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.helpers.VolumeIndicator;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.ta4j.core.TestUtils.assertNumEquals;
@@ -11,8 +17,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -35,7 +41,7 @@ public class AnchoredVWAPIndicatorTest extends AbstractIndicatorTest<Indicator<N
     /**
      * Initializes the test fixtures used by these scenarios.
      */
-    @Before
+    @BeforeEach
     public void setUp() {
         series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
         series.barBuilder().openPrice(10).closePrice(10).highPrice(10).lowPrice(10).volume(100).add();
@@ -200,4 +206,15 @@ public class AnchoredVWAPIndicatorTest extends AbstractIndicatorTest<Indicator<N
             return unstableBars;
         }
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+        VolumeIndicator volume = new VolumeIndicator(series);
+
+        return List
+                .of(serializationFixture(series, new AnchoredVWAPIndicator(close, volume, 5), stableIndexes(series)));
+    }
+
 }

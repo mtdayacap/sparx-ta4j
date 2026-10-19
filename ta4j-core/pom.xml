@@ -4,12 +4,17 @@
     <parent>
         <groupId>org.ta4j</groupId>
         <artifactId>ta4j-parent</artifactId>
-        <version>0.22.7-SNAPSHOT</version>
+        <version>0.26.1-SNAPSHOT</version>
     </parent>
     <artifactId>ta4j-core</artifactId>
 
     <name>Ta4j Core</name>
     <description>ta4j is a Java library providing a simple API for technical analysis.</description>
+
+    <properties>
+        <!-- Coverage ratchet: current floor; raise as coverage improves, never lower. -->
+        <ta4j.jacoco.branch.minimum>0.75</ta4j.jacoco.branch.minimum>
+    </properties>
 
     <dependencies>
 
@@ -37,11 +42,6 @@
             <scope>test</scope>
         </dependency>
         <dependency>
-            <groupId>org.junit.vintage</groupId>
-            <artifactId>junit-vintage-engine</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
             <groupId>org.assertj</groupId>
             <artifactId>assertj-core</artifactId>
             <scope>test</scope>
@@ -62,11 +62,17 @@
             <artifactId>log4j-slf4j2-impl</artifactId>
             <scope>test</scope>
         </dependency>
+        <dependency>
+            <groupId>com.github.spotbugs</groupId>
+            <artifactId>spotbugs-annotations</artifactId>
+            <version>4.9.8</version>
+            <scope>provided</scope>
+        </dependency>
 
     </dependencies>
     <build>
         <plugins>
-            <!-- Override parent: header/config live in parent dir (avoids CWD dependency when building from workspace root) -->
+            <!-- Override parent: header lives in parent dir (avoids CWD dependency when building from workspace root) -->
             <plugin>
                 <groupId>com.mycila</groupId>
                 <artifactId>license-maven-plugin</artifactId>
@@ -79,13 +85,6 @@
                             </includes>
                         </licenseSet>
                     </licenseSets>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>net.revelc.code.formatter</groupId>
-                <artifactId>formatter-maven-plugin</artifactId>
-                <configuration>
-                    <configFile>${project.parent.basedir}/code-formatter.xml</configFile>
                 </configuration>
             </plugin>
             <plugin>

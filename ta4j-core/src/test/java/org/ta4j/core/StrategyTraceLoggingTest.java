@@ -3,22 +3,14 @@
  */
 package org.ta4j.core;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-import java.io.StringWriter;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import org.apache.logging.log4j.Level;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.core.Appender;
-import org.apache.logging.log4j.core.LoggerContext;
-import org.apache.logging.log4j.core.appender.WriterAppender;
-import org.apache.logging.log4j.core.config.Configuration;
-import org.apache.logging.log4j.core.config.LoggerConfig;
-import org.apache.logging.log4j.core.layout.PatternLayout;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.ta4j.core.rules.AndRule;
 import org.ta4j.core.rules.FixedRule;
 
 /**
@@ -27,133 +19,98 @@ import org.ta4j.core.rules.FixedRule;
  */
 public class StrategyTraceLoggingTest {
 
-    private LoggerContext loggerContext;
-    private StringWriter logOutput;
-    private Appender appender;
-    private Appender consoleAppender;
-    private Level originalLevel;
-    private LoggerConfig rootLoggerConfig;
+    private TraceTestLogger traceTestLogger;
 
-    @Before
+    @BeforeEach
     public void setUp() {
-        loggerContext = (LoggerContext) LogManager.getContext(false);
-        Configuration config = loggerContext.getConfiguration();
-        rootLoggerConfig = config.getLoggerConfig(LogManager.ROOT_LOGGER_NAME);
-
-        // Store original level
-        originalLevel = rootLoggerConfig.getLevel();
-
-        // Temporarily remove Console appender to prevent trace logs from going to
-        // stdout
-        // This keeps build output clean while still allowing us to capture trace logs
-        consoleAppender = rootLoggerConfig.getAppenders().get("Console");
-        if (consoleAppender != null) {
-            rootLoggerConfig.removeAppender("Console");
-        }
-
-        // Set trace level for strategy loggers
-        rootLoggerConfig.setLevel(Level.TRACE);
-        loggerContext.updateLoggers();
-
-        // Create a string writer to capture log output
-        logOutput = new StringWriter();
-        PatternLayout layout = PatternLayout.newBuilder().withPattern("%msg%n").build();
-        appender = WriterAppender.newBuilder().setTarget(logOutput).setLayout(layout).setName("TestAppender").build();
-        appender.start();
-
-        // Add appender to root logger to capture trace logs
-        rootLoggerConfig.addAppender(appender, Level.TRACE, null);
-        loggerContext.updateLoggers();
+        traceTestLogger = new TraceTestLogger();
+        traceTestLogger.open();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
-        if (appender != null) {
-            appender.stop();
-            Configuration config = loggerContext.getConfiguration();
-            LoggerConfig loggerConfig = config.getLoggerConfig(LogManager.ROOT_LOGGER_NAME);
-            loggerConfig.removeAppender(appender.getName());
-        }
-
-        // Restore Console appender if it was removed
-        if (consoleAppender != null) {
-            rootLoggerConfig.addAppender(consoleAppender, null, null);
-        }
-
-        // Restore original level
-        if (originalLevel != null) {
-            Configuration config = loggerContext.getConfiguration();
-            LoggerConfig loggerConfig = config.getLoggerConfig(LogManager.ROOT_LOGGER_NAME);
-            loggerConfig.setLevel(originalLevel);
-            loggerContext.updateLoggers();
-        }
+        traceTestLogger.close();
     }
 
     @Test
     public void traceLoggingUsesClassNameWhenNoCustomNameSet() {
         Strategy strategy = new BaseStrategy(new FixedRule(1), new FixedRule(2));
-        logOutput.getBuffer().setLength(0);
+        traceTestLogger.clear();
 
         strategy.shouldEnter(0, new BaseTradingRecord());
 
-        String logContent = logOutput.toString();
-        assertTrue("Trace log should contain class name when no custom name is set",
-                logContent.contains("BaseStrategy#shouldEnter"));
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains("BaseStrategy#shouldEnter"),
+                "Trace log should contain class name when no custom name is set");
+    }
+
+    @Test
+    public void traceLoggingExplainsUnstableStrategyDecision() {
+        Strategy strategy = new BaseStrategy("Unstable Strategy", new FixedRule(1), new FixedRule(2), 3);
+        traceTestLogger.clear();
+
+        assertFalse(strategy.shouldEnter(1, new BaseTradingRecord()));
+
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains(">>> Unstable Strategy#shouldEnter(1): false"),
+                "Strategy trace should include the false entry decision");
+        assertTrue(logContent.contains("reason=unstable"), "Strategy trace should explain unstable-bar suppression");
+        assertTrue(logContent.contains("unstableBars=3"), "Strategy trace should include the unstable bar count");
     }
 
     @Test
     public void traceLoggingUsesCustomNameWhenSet() {
         Strategy strategy = new BaseStrategy("My Custom Strategy", new FixedRule(1), new FixedRule(2));
-        logOutput.getBuffer().setLength(0);
+        traceTestLogger.clear();
 
         strategy.shouldEnter(0, new BaseTradingRecord());
 
-        String logContent = logOutput.toString();
-        assertTrue("Trace log should contain custom name when set",
-                logContent.contains("My Custom Strategy#shouldEnter"));
-        assertFalse("Trace log should not contain class name when custom name is set",
-                logContent.contains("BaseStrategy#shouldEnter"));
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains("My Custom Strategy#shouldEnter"),
+                "Trace log should contain custom name when set");
+        assertFalse(logContent.contains("BaseStrategy#shouldEnter"),
+                "Trace log should not contain class name when custom name is set");
     }
 
     @Test
     public void traceLoggingUsesCustomNameForShouldExit() {
         Strategy strategy = new BaseStrategy("5min Entry Strategy", new FixedRule(1), new FixedRule(2));
-        logOutput.getBuffer().setLength(0);
+        traceTestLogger.clear();
 
         strategy.shouldExit(0, new BaseTradingRecord());
 
-        String logContent = logOutput.toString();
-        assertTrue("Trace log should contain custom name for shouldExit",
-                logContent.contains("5min Entry Strategy#shouldExit"));
-        assertFalse("Trace log should not contain class name when custom name is set",
-                logContent.contains("BaseStrategy#shouldExit"));
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains("5min Entry Strategy#shouldExit"),
+                "Trace log should contain custom name for shouldExit");
+        assertFalse(logContent.contains("BaseStrategy#shouldExit"),
+                "Trace log should not contain class name when custom name is set");
     }
 
     @Test
     public void traceLoggingUsesClassNameForShouldExitWhenNoCustomName() {
         Strategy strategy = new BaseStrategy(new FixedRule(1), new FixedRule(2));
-        logOutput.getBuffer().setLength(0);
+        traceTestLogger.clear();
 
         strategy.shouldExit(0, new BaseTradingRecord());
 
-        String logContent = logOutput.toString();
-        assertTrue("Trace log should contain class name for shouldExit when no custom name is set",
-                logContent.contains("BaseStrategy#shouldExit"));
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains("BaseStrategy#shouldExit"),
+                "Trace log should contain class name for shouldExit when no custom name is set");
     }
 
     @Test
     public void traceLoggingWorksForBothShouldEnterAndShouldExit() {
         Strategy strategy = new BaseStrategy("Multi-Timeframe Strategy", new FixedRule(1), new FixedRule(2));
-        logOutput.getBuffer().setLength(0);
+        traceTestLogger.clear();
 
         strategy.shouldEnter(0, new BaseTradingRecord());
         strategy.shouldExit(1, new BaseTradingRecord());
 
-        String logContent = logOutput.toString();
-        assertTrue("Trace log should contain custom name for shouldEnter",
-                logContent.contains("Multi-Timeframe Strategy#shouldEnter"));
-        assertTrue("Trace log should contain custom name for shouldExit",
-                logContent.contains("Multi-Timeframe Strategy#shouldExit"));
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains("Multi-Timeframe Strategy#shouldEnter"),
+                "Trace log should contain custom name for shouldEnter");
+        assertTrue(logContent.contains("Multi-Timeframe Strategy#shouldExit"),
+                "Trace log should contain custom name for shouldExit");
     }
 
     @Test
@@ -161,27 +118,141 @@ public class StrategyTraceLoggingTest {
         Strategy strategy1 = new BaseStrategy("Strategy 5min", new FixedRule(1), new FixedRule(2));
         Strategy strategy2 = new BaseStrategy("Strategy 15min", new FixedRule(3), new FixedRule(4));
 
-        logOutput.getBuffer().setLength(0);
+        traceTestLogger.clear();
         strategy1.shouldEnter(0, new BaseTradingRecord());
         strategy2.shouldEnter(0, new BaseTradingRecord());
 
-        String logContent = logOutput.toString();
-        assertTrue("First strategy should use its custom name in trace log",
-                logContent.contains("Strategy 5min#shouldEnter"));
-        assertTrue("Second strategy should use its custom name in trace log",
-                logContent.contains("Strategy 15min#shouldEnter"));
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains("Strategy 5min#shouldEnter"),
+                "First strategy should use its custom name in trace log");
+        assertTrue(logContent.contains("Strategy 15min#shouldEnter"),
+                "Second strategy should use its custom name in trace log");
     }
 
     @Test
     public void traceLoggingIncludesPrefixForStrategyTraces() {
         Strategy strategy = new BaseStrategy("Test Strategy", new FixedRule(1), new FixedRule(2));
-        logOutput.getBuffer().setLength(0);
+        traceTestLogger.clear();
 
         strategy.shouldEnter(0, new BaseTradingRecord());
 
-        String logContent = logOutput.toString();
-        assertTrue("Trace log should include >>> prefix for strategy traces", logContent.contains(">>>"));
-        assertTrue("Trace log should contain custom name after prefix",
-                logContent.contains(">>> Test Strategy#shouldEnter"));
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains(">>>"), "Trace log should include >>> prefix for strategy traces");
+        assertTrue(logContent.contains(">>> Test Strategy#shouldEnter"),
+                "Trace log should contain custom name after prefix");
+    }
+
+    @Test
+    public void traceLoggingFollowsStrategyLoggerTraceByDefault() {
+        Strategy strategy = new BaseStrategy("Default Trace Strategy", new FixedRule(1), new FixedRule(2));
+        traceTestLogger.clear();
+
+        strategy.shouldEnter(0, new BaseTradingRecord());
+
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains("Default Trace Strategy#shouldEnter"),
+                "TRACE logging should emit strategy decisions without mutable trace state");
+        assertTrue(logContent.contains("mode=VERBOSE"), "Default strategy traces should use verbose mode");
+    }
+
+    @Test
+    public void traceLoggingSummaryModeEvaluatesEntryRuleWithScopedTracePolicy() {
+        FixedRule child1 = new FixedRule(1);
+        child1.setName("Entry Child 1");
+        FixedRule child2 = new FixedRule(1);
+        child2.setName("Entry Child 2");
+        AndRule entryRule = new AndRule(child1, child2);
+        entryRule.setName("Entry Composite");
+        Strategy strategy = new BaseStrategy("Trace Strategy", entryRule, new FixedRule(2));
+
+        traceTestLogger.clear();
+        strategy.shouldEnterWithTraceMode(1, new BaseTradingRecord(), Rule.TraceMode.SUMMARY);
+
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains(">>> Trace Strategy#shouldEnter"),
+                "Summary mode should log the strategy decision");
+        assertTrue(logContent.contains("Entry Composite#isSatisfied"), "Summary mode should log the entry rule");
+        assertTrue(logContent.contains("mode=SUMMARY ruleType=AndRule path=root depth=0"),
+                "Summary mode should mark the scoped root path");
+        assertFalse(logContent.contains("Entry Child 1#isSatisfied"), "Summary mode should suppress first child logs");
+        assertFalse(logContent.contains("Entry Child 2#isSatisfied"), "Summary mode should suppress second child logs");
+    }
+
+    @Test
+    public void traceLoggingVerboseModeEvaluatesExitRuleWithScopedTracePolicy() {
+        FixedRule child1 = new FixedRule(2);
+        child1.setName("Exit Child 1");
+        FixedRule child2 = new FixedRule(2);
+        child2.setName("Exit Child 2");
+        AndRule exitRule = new AndRule(child1, child2);
+        exitRule.setName("Exit Composite");
+        Strategy strategy = new BaseStrategy("Trace Strategy", new FixedRule(1), exitRule);
+
+        traceTestLogger.clear();
+        strategy.shouldExit(2, new BaseTradingRecord());
+
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains(">>> Trace Strategy#shouldExit"),
+                "Verbose mode should log the strategy exit decision");
+        assertTrue(logContent.contains("Exit Composite#isSatisfied"), "Verbose mode should log the exit rule");
+        assertTrue(logContent.contains("Exit Child 1#isSatisfied"), "Verbose mode should log first exit child");
+        assertTrue(logContent.contains("Exit Child 2#isSatisfied"), "Verbose mode should log second exit child");
+        assertTrue(logContent.contains("path=root.rule1 depth=1"),
+                "Verbose mode should attribute the first child path");
+        assertTrue(logContent.contains("path=root.rule2 depth=1"),
+                "Verbose mode should attribute the second child path");
+    }
+
+    @Test
+    public void traceLoggingDoesNotCreateStrategyScopeWhenStrategyLoggerTraceIsDisabled() {
+        FixedRule entryRule = new FixedRule(1);
+        entryRule.setName("Entry Child");
+        Strategy strategy = new BaseStrategy("Trace Strategy", entryRule, new FixedRule(2));
+
+        traceTestLogger.setLoggerLevel(BaseStrategy.class, Level.INFO);
+        traceTestLogger.setLoggerLevel(FixedRule.class, Level.TRACE);
+        traceTestLogger.clear();
+        try {
+            strategy.shouldEnter(1, new BaseTradingRecord());
+        } finally {
+            traceTestLogger.clearLoggerLevel(FixedRule.class);
+            traceTestLogger.clearLoggerLevel(BaseStrategy.class);
+        }
+
+        String logContent = traceTestLogger.getLogOutput();
+        assertFalse(logContent.contains(">>> Trace Strategy#shouldEnter"),
+                "Strategy should not emit strategy logs when the strategy logger is not tracing");
+        assertTrue(logContent.contains("Entry Child#isSatisfied"),
+                "A TRACE-enabled child logger should still emit its own default trace");
+        assertTrue(logContent.contains("path=root depth=0"), "Child trace should not inherit a strategy parent frame");
+    }
+
+    @Test
+    public void traceLoggingCanBeScopedToSingleStrategyEvaluationWithoutMutatingStrategyMode() {
+        FixedRule child1 = new FixedRule(1);
+        child1.setName("Scoped Entry Child 1");
+        FixedRule child2 = new FixedRule(1);
+        child2.setName("Scoped Entry Child 2");
+        AndRule entryRule = new AndRule(child1, child2);
+        entryRule.setName("Scoped Entry Composite");
+        Strategy strategy = new BaseStrategy("Scoped Strategy", entryRule, new FixedRule(2));
+
+        traceTestLogger.clear();
+        assertTrue(strategy.shouldEnterWithTraceMode(1, new BaseTradingRecord(), Rule.TraceMode.VERBOSE));
+
+        String logContent = traceTestLogger.getLogOutput();
+        assertTrue(logContent.contains(">>> Scoped Strategy#shouldEnter"),
+                "Scoped verbose evaluation should log the strategy decision");
+        assertTrue(logContent.contains("Scoped Entry Composite#isSatisfied"),
+                "Scoped verbose evaluation should log the entry composite");
+        assertTrue(logContent.contains("Scoped Entry Child 1#isSatisfied"),
+                "Scoped verbose evaluation should log first child");
+        assertTrue(logContent.contains("Scoped Entry Child 2#isSatisfied"),
+                "Scoped verbose evaluation should log second child");
+
+        traceTestLogger.clear();
+        assertTrue(strategy.shouldEnter(1, new BaseTradingRecord()));
+        assertTrue(traceTestLogger.getLogOutput().contains("mode=VERBOSE"),
+                "A scoped strategy evaluation should not suppress later default TRACE behavior");
     }
 }

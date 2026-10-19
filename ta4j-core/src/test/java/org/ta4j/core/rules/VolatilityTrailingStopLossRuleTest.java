@@ -3,12 +3,12 @@
  */
 package org.ta4j.core.rules;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Indicator;
@@ -88,6 +88,18 @@ public class VolatilityTrailingStopLossRuleTest extends AbstractIndicatorTest<Ba
     }
 
     @Test
+    public void returnsFalseForIndexBeforeEntry() {
+        BarSeries series = StopRuleTestSupport.series(numFactory, 100, 120, 130);
+        ClosePriceIndicator closePrice = new ClosePriceIndicator(series);
+        ConstantIndicator<Num> volatility = new ConstantIndicator<>(series, numFactory.numOf(5));
+        VolatilityTrailingStopLossRule rule = new VolatilityTrailingStopLossRule(closePrice, volatility, 1);
+        BaseTradingRecord tradingRecord = new BaseTradingRecord(TradeType.BUY);
+        tradingRecord.enter(2, numFactory.hundred(), numFactory.one());
+
+        assertFalse(rule.isSatisfied(1, tradingRecord));
+    }
+
+    @Test
     public void serializeAndDeserialize() {
         var series = StopRuleTestSupport.series(numFactory, 100, 90, 80, 86);
         var closePrice = new ClosePriceIndicator(series);
@@ -104,6 +116,10 @@ public class VolatilityTrailingStopLossRuleTest extends AbstractIndicatorTest<Ba
         var volatility = new ConstantIndicator<>(series, numFactory.numOf(5));
         assertThrows(IllegalArgumentException.class,
                 () -> new VolatilityTrailingStopLossRule(closePrice, volatility, 2, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> new VolatilityTrailingStopLossRule(closePrice, volatility, 0, 2));
+        assertThrows(IllegalArgumentException.class,
+                () -> new VolatilityTrailingStopLossRule(closePrice, volatility, -1, 2));
         assertThrows(IllegalArgumentException.class,
                 () -> new VolatilityTrailingStopLossRule((Indicator<Num>) null, volatility, 2, 2));
     }

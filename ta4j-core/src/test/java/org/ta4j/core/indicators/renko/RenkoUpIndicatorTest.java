@@ -5,7 +5,7 @@ package org.ta4j.core.indicators.renko;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -13,6 +13,7 @@ import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.num.NumFactory;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class RenkoUpIndicatorTest extends AbstractIndicatorTest<Indicator<Boolean>, Num> {
 
@@ -68,14 +69,33 @@ public class RenkoUpIndicatorTest extends AbstractIndicatorTest<Indicator<Boolea
         assertThat(indicator.getValue(1)).as("large move forms three bricks").isTrue();
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void rejectsNonPositivePointSize() {
-        new RenkoUpIndicator(new ClosePriceIndicator(buildSeries(100d, 100.5d)), 0d, 1);
+    @Test
+    public void matchesFreshIndicatorAfterRollingWindowExpiry() {
+        var series = buildSeries(100d, 100.4d, 100.9d, 101.6d, 101.2d, 101.8d);
+        series.setMaximumBarCount(3);
+
+        var existing = new RenkoUpIndicator(new ClosePriceIndicator(series), 0.5d, 2);
+        assertThat(existing.getValue(series.getEndIndex())).as("no bricks within retained window").isFalse();
+
+        series.barBuilder().openPrice(102.5).highPrice(102.5).lowPrice(102.5).closePrice(102.5).add();
+
+        var fresh = new RenkoUpIndicator(new ClosePriceIndicator(series), 0.5d, 2);
+        assertThat(existing.getValue(series.getEndIndex())).as("matches fresh indicator after expiry")
+                .isEqualTo(fresh.getValue(series.getEndIndex()));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
+    public void rejectsNonPositivePointSize() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            new RenkoUpIndicator(new ClosePriceIndicator(buildSeries(100d, 100.5d)), 0d, 1);
+        });
+    }
+
+    @Test
     public void rejectsNonPositiveBrickCount() {
-        new RenkoUpIndicator(new ClosePriceIndicator(buildSeries(100d, 100.5d)), 0.5d, 0);
+        assertThrows(IllegalArgumentException.class, () -> {
+            new RenkoUpIndicator(new ClosePriceIndicator(buildSeries(100d, 100.5d)), 0.5d, 0);
+        });
     }
 
     private BarSeries buildSeries(double... closes) {

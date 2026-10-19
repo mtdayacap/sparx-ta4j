@@ -3,9 +3,14 @@
  */
 package org.ta4j.core.indicators.adx;
 
-import static org.junit.Assert.assertEquals;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
 
-import org.junit.Test;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.ExternalIndicatorTest;
 import org.ta4j.core.Indicator;
@@ -43,6 +48,12 @@ public class MinusDIIndicatorTest extends AbstractIndicatorTest<BarSeries, Num> 
         assertEquals(14, indicator.getCountOfUnstableBars());
         assertEquals(20.9020, indicator.getValue(indicator.getBarSeries().getEndIndex()).doubleValue(),
                 TestUtils.GENERAL_OFFSET);
+    }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        return List.of(serializationFixture(series, new MinusDIIndicator(series, 7), stableIndexes(series)));
     }
 
 }

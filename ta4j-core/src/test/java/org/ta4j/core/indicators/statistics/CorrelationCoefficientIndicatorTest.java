@@ -3,13 +3,18 @@
  */
 package org.ta4j.core.indicators.statistics;
 
-import static org.junit.Assert.assertTrue;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
 import java.time.Instant;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -27,7 +32,7 @@ public class CorrelationCoefficientIndicatorTest extends AbstractIndicatorTest<I
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         int i = 20;
         var now = Instant.now();
@@ -110,4 +115,58 @@ public class CorrelationCoefficientIndicatorTest extends AbstractIndicatorTest<I
             assertNumEquals(sampleWithOne.getValue(i), sampleWithNegative.getValue(i), 1.0e-12);
         }
     }
+
+    @Test
+    public void anchorsWindowAtBeginIndexAfterRemoval() {
+        // Evict the first four bars so beginIndex = 4; the retained (close, volume)
+        // pairs sit at absolute indices 4..9: (5,10) (6,5) (7,14) (8,7) (9,18) (10,9).
+        int i = 10;
+        var now = Instant.now();
+        BarSeries pruned = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        double[] closes = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+        double[] volumes = { 4, 1, 6, 3, 10, 5, 14, 7, 18, 9 };
+        for (int j = 0; j < closes.length; j++) {
+            pruned.barBuilder().endTime(now.minusSeconds(i--)).closePrice(closes[j]).volume(volumes[j]).add();
+        }
+        pruned.setMaximumBarCount(6);
+
+        ClosePriceIndicator close = new ClosePriceIndicator(pruned);
+        VolumeIndicator volume = new VolumeIndicator(pruned, 1);
+        // Window [4..8]: covariance = 3.6, variance(close) = 2, variance(volume) =
+        // 22.16
+        // -> correlation = 3.6 / sqrt(2 * 22.16) = 0.5408
+        assertNumEquals(0.5408, new CorrelationCoefficientIndicator(close, volume, 6).getValue(8));
+        // Sample scaling (n / (n - 1)) cancels in the correlation ratio
+        assertNumEquals(0.5408, CorrelationCoefficientIndicator.ofSample(close, volume, 6).getValue(8));
+        // Window [4..9]: covariance = 2.25, variances = 17.5/6 and 113.5/6 -> 0.3029
+        assertNumEquals(0.3029, new CorrelationCoefficientIndicator(close, volume, 6).getValue(9));
+    }
+
+    @Test
+    public void acceptsAlignedInputsFromSeparateSeries() {
+        BarSeries xSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        BarSeries ySeries = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        var now = Instant.now();
+        for (int j = 0; j < 5; j++) {
+            xSeries.barBuilder().endTime(now.minusSeconds(2L * (4 - j))).closePrice(2 * (j + 1)).add();
+            ySeries.barBuilder().endTime(now.minusSeconds(2L * (4 - j))).closePrice(5 * (j + 1)).add();
+        }
+
+        var coef = new CorrelationCoefficientIndicator(new ClosePriceIndicator(xSeries),
+                new ClosePriceIndicator(ySeries), 5);
+
+        // Perfectly linear pairs (2,5), (4,10), (6,15), (8,20), (10,25)
+        assertNumEquals(1, coef.getValue(4));
+    }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+        VolumeIndicator volume = new VolumeIndicator(series);
+
+        return List.of(serializationFixture(series,
+                new CorrelationCoefficientIndicator(close, volume, 8, SampleType.SAMPLE), stableIndexes(series)));
+    }
+
 }

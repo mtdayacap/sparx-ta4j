@@ -3,14 +3,15 @@
  */
 package org.ta4j.core.indicators.averages;
 
-import static junit.framework.TestCase.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
+import org.ta4j.core.indicators.StochasticIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
@@ -24,7 +25,7 @@ public class ZLEMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Nu
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         data = new MockBarSeriesBuilder().withNumFactory(numFactory)
                 .withData(10, 15, 20, 18, 17, 18, 15, 12, 10, 8, 5, 2)
@@ -60,5 +61,21 @@ public class ZLEMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Nu
     public void smallBarCount() {
         var zlema = new ZLEMAIndicator(new ClosePriceIndicator(data), 1);
         assertNumEquals(10, zlema.getValue(0));
+    }
+
+    @Test
+    public void retainedWindowReanchorsAfterStochasticInvalidation() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        for (double close : new double[] { 10, 20, 30, 40, 40, 40, 40, 40 }) {
+            series.barBuilder().openPrice(close).closePrice(close).highPrice(close).lowPrice(close).add();
+        }
+        StochasticIndicator stochastic = new StochasticIndicator(new ClosePriceIndicator(series), 3);
+        ZLEMAIndicator zlema = new ZLEMAIndicator(stochastic, 2);
+        zlema.getValue(7); // NaN chain before the advance
+
+        series.setMaximumBarCount(5);
+
+        assertEquals(3, series.getBeginIndex());
+        assertNumEquals(0, zlema.getValue(3));
     }
 }

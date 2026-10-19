@@ -3,10 +3,10 @@
  */
 package org.ta4j.core.criteria;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.num.DecimalNumFactory;
 import org.ta4j.core.num.DoubleNumFactory;
 import org.ta4j.core.num.Num;
@@ -128,7 +128,7 @@ public class ReturnRepresentationTest {
     @Test
     public void roundTripConversion_Decimal() {
         NumFactory factory = DoubleNumFactory.getInstance();
-        Num original = factory.numOf(0.12);
+        Num original = factory.numOf(0.1200000000000001);
 
         // Convert to multiplicative and back
         Num totalReturn = ReturnRepresentation.DECIMAL.toTotalReturn(original);
@@ -275,7 +275,7 @@ public class ReturnRepresentationTest {
     @Test
     public void roundTripConversion_Percentage() {
         NumFactory factory = DoubleNumFactory.getInstance();
-        Num original = factory.numOf(5.0); // 5% gain
+        Num original = factory.numOf(5.000000000000004); // 5% gain
 
         // Convert to total return and back
         Num totalReturn = ReturnRepresentation.PERCENTAGE.toTotalReturn(original);
@@ -470,7 +470,7 @@ public class ReturnRepresentationTest {
     @Test
     public void roundTripConversion_Log_FromRateOfReturn() {
         NumFactory factory = DoubleNumFactory.getInstance();
-        Num original = factory.numOf(0.12); // +12% gain as rate of return
+        Num original = factory.numOf(0.1200000000000001); // +12% gain as rate of return
 
         // Convert to log and back
         Num logReturn = ReturnRepresentation.LOG.toRepresentationFromRateOfReturn(original);

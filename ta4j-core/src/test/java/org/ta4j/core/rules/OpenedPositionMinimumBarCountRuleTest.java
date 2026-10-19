@@ -3,25 +3,30 @@
  */
 package org.ta4j.core.rules;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Trade;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.DecimalNumFactory;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class OpenedPositionMinimumBarCountRuleTest {
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testAtLeastBarCountRuleForNegativeNumberShouldThrowException() {
-        new OpenedPositionMinimumBarCountRule(-1);
+        assertThrows(IllegalArgumentException.class, () -> {
+            new OpenedPositionMinimumBarCountRule(-1);
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testAtLeastBarCountRuleForZeroShouldThrowException() {
-        new OpenedPositionMinimumBarCountRule(0);
+        assertThrows(IllegalArgumentException.class, () -> {
+            new OpenedPositionMinimumBarCountRule(0);
+        });
     }
 
     @Test
@@ -75,6 +80,14 @@ public class OpenedPositionMinimumBarCountRuleTest {
         assertFalse(rule.isSatisfied(1, tradingRecord));
         assertFalse(rule.isSatisfied(2, tradingRecord));
         assertFalse(rule.isSatisfied(3, tradingRecord));
+    }
+
+    @Test
+    public void testAtLeastBarCountRuleForNullTradingRecordShouldAlwaysReturnsFalse() {
+        final var rule = new OpenedPositionMinimumBarCountRule(1);
+
+        assertFalse(rule.isSatisfied(0, null));
+        assertFalse(rule.isSatisfied(1, null));
     }
 
     @Test

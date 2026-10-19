@@ -3,12 +3,13 @@
  */
 package org.ta4j.core.analysis.cost;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Position;
 import org.ta4j.core.Trade;
 import org.ta4j.core.num.DoubleNum;
@@ -18,7 +19,7 @@ public class LinearBorrowingCostModelTest {
 
     private CostModel borrowingModel;
 
-    @Before
+    @BeforeEach
     public void setUp() throws Exception {
         borrowingModel = new LinearBorrowingCostModel(0.01);
     }
@@ -85,14 +86,77 @@ public class LinearBorrowingCostModelTest {
         LinearBorrowingCostModel model = new LinearBorrowingCostModel(0.1);
         CostModel modelSameClass = new LinearBorrowingCostModel(0.2);
         CostModel modelSameFee = new LinearBorrowingCostModel(0.1);
+        CostModel modelSameFeeLongOnly = new LinearBorrowingCostModel(0.1,
+                LinearBorrowingCostModel.Applicability.LONG_ONLY);
         CostModel modelOther = new ZeroCostModel();
 
         boolean equality = model.equals(modelSameFee);
         boolean inequality1 = model.equals(modelSameClass);
-        boolean inequality2 = model.equals(modelOther);
+        boolean inequality2 = model.equals(modelSameFeeLongOnly);
+        boolean inequality3 = model.equals(modelOther);
 
         assertTrue(equality);
         assertFalse(inequality1);
         assertFalse(inequality2);
+        assertFalse(inequality3);
+    }
+
+    @Test
+    public void buyPositionIncursCostWithBothApplicability() {
+        CostModel model = new LinearBorrowingCostModel(0.01, LinearBorrowingCostModel.Applicability.BOTH);
+        int holdingPeriod = 2;
+        Trade entry = Trade.buyAt(0, DoubleNum.valueOf(100), DoubleNum.valueOf(1));
+        Trade exit = Trade.sellAt(holdingPeriod, DoubleNum.valueOf(110), DoubleNum.valueOf(1));
+        Position position = new Position(entry, exit, new ZeroCostModel(), model);
+
+        assertNumEquals(DoubleNum.valueOf(2), model.calculate(position, holdingPeriod));
+    }
+
+    @Test
+    public void sellPositionIncursCostWithBothApplicability() {
+        CostModel model = new LinearBorrowingCostModel(0.01, LinearBorrowingCostModel.Applicability.BOTH);
+        int holdingPeriod = 2;
+        Trade entry = Trade.sellAt(0, DoubleNum.valueOf(100), DoubleNum.valueOf(1));
+        Trade exit = Trade.buyAt(holdingPeriod, DoubleNum.valueOf(90), DoubleNum.valueOf(1));
+        Position position = new Position(entry, exit, new ZeroCostModel(), model);
+
+        assertNumEquals(DoubleNum.valueOf(2), model.calculate(position, holdingPeriod));
+    }
+
+    @Test
+    public void buyPositionIncursCostWithLongOnlyApplicability() {
+        CostModel model = new LinearBorrowingCostModel(0.01, LinearBorrowingCostModel.Applicability.LONG_ONLY);
+        int holdingPeriod = 2;
+        Trade entry = Trade.buyAt(0, DoubleNum.valueOf(100), DoubleNum.valueOf(1));
+        Trade exit = Trade.sellAt(holdingPeriod, DoubleNum.valueOf(110), DoubleNum.valueOf(1));
+        Position position = new Position(entry, exit, new ZeroCostModel(), model);
+
+        assertNumEquals(DoubleNum.valueOf(2), model.calculate(position, holdingPeriod));
+    }
+
+    @Test
+    public void sellPositionHasNoCostWithLongOnlyApplicability() {
+        CostModel model = new LinearBorrowingCostModel(0.01, LinearBorrowingCostModel.Applicability.LONG_ONLY);
+        int holdingPeriod = 2;
+        Trade entry = Trade.sellAt(0, DoubleNum.valueOf(100), DoubleNum.valueOf(1));
+        Trade exit = Trade.buyAt(holdingPeriod, DoubleNum.valueOf(90), DoubleNum.valueOf(1));
+        Position position = new Position(entry, exit, new ZeroCostModel(), model);
+
+        assertNumEquals(DoubleNum.valueOf(0), model.calculate(position, holdingPeriod));
+    }
+
+    @Test
+    public void openBuyPositionIncursCostWithLongOnlyApplicability() {
+        CostModel model = new LinearBorrowingCostModel(0.01, LinearBorrowingCostModel.Applicability.LONG_ONLY);
+        int currentIndex = 4;
+        Position position = new Position(Trade.TradeType.BUY, new ZeroCostModel(), model);
+        position.operate(0, DoubleNum.valueOf(100), DoubleNum.valueOf(1));
+
+        assertNumEquals(DoubleNum.valueOf(4), model.calculate(position, currentIndex));
+    }
+
+    @Test
+    public void constructorRejectsNullApplicability() {
+        assertThrows(NullPointerException.class, () -> new LinearBorrowingCostModel(0.01, null));
     }
 }

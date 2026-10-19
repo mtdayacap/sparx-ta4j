@@ -3,10 +3,15 @@
  */
 package org.ta4j.core.indicators;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
@@ -22,7 +27,7 @@ public class CMOIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num>
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         series = new MockBarSeriesBuilder().withNumFactory(numFactory)
                 .withData(21.27, 22.19, 22.08, 22.47, 22.48, 22.53, 22.23, 21.43, 21.24, 21.29, 22.15, 22.39, 22.38,
@@ -47,4 +52,13 @@ public class CMOIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num>
         assertNumEquals(24.1983, cmo.getValue(14));
         assertNumEquals(47.644, cmo.getValue(15));
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+
+        return List.of(serializationFixture(series, new CMOIndicator(close, 5), stableIndexes(series)));
+    }
+
 }

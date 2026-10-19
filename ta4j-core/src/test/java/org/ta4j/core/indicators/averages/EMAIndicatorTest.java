@@ -4,16 +4,18 @@
 package org.ta4j.core.indicators.averages;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 import static org.ta4j.core.num.NaN.NaN;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.ExternalIndicatorTest;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.TestUtils;
+import org.ta4j.core.indicators.AbstractIndicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.indicators.RSIIndicator;
 import org.ta4j.core.indicators.XLSIndicatorTest;
@@ -25,6 +27,13 @@ import org.ta4j.core.num.NumFactory;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class EMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num> {
 
@@ -37,7 +46,7 @@ public class EMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num>
 
     private BarSeries data;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         data = new MockBarSeriesBuilder().withNumFactory(numFactory)
                 .withData(64.75, 63.79, 63.73, 63.73, 63.55, 63.19, 63.91, 63.85, 62.95, 63.37, 61.33, 61.51)
@@ -49,6 +58,242 @@ public class EMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num>
         Indicator<Num> indicator = getIndicator(new ClosePriceIndicator(data), 1);
         // With barCount=1, unstable period is 1, so index 0 should return NaN
         assertThat(Double.isNaN(indicator.getValue(0).doubleValue())).isTrue();
+    }
+
+    @Test
+    public void movingSeriesContinuesRecurrenceAcrossHeadAdvances() {
+        // #1666: a moving series drops a bar on every append. Each appended bar
+        // must extend the cached recurrence, so live and historical reads match
+        // an unbounded series instead of a chain rebuilt from the retained head.
+        double[] closes = { 10, 13, 9, 15, 11, 17, 12, 19, 14, 21, 13, 18 };
+        BarSeries moving = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        moving.setMaximumBarCount(4);
+        BarSeries unbounded = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(moving), 3);
+        EMAIndicator reference = new EMAIndicator(new ClosePriceIndicator(unbounded), 3);
+        for (int i = 0; i < closes.length; i++) {
+            moving.barBuilder().closePrice(closes[i]).add();
+            unbounded.barBuilder().closePrice(closes[i]).add();
+            assertNumEquals(reference.getValue(i), ema.getValue(i));
+        }
+        assertEquals(8, moving.getBeginIndex());
+        for (int i = moving.getBeginIndex(); i <= moving.getEndIndex(); i++) {
+            assertNumEquals(reference.getValue(i), ema.getValue(i));
+        }
+
+        // Without cached predecessors the chain re-seeds at the retained head
+        // and warms up from there.
+        EMAIndicator fresh = new EMAIndicator(new ClosePriceIndicator(moving), 3);
+        assertTrue(fresh.getValue(10).isNaN());
+        assertNumEquals(18, fresh.getValue(11));
+    }
+
+    @Test
+    public void twoBarWindowContinuesChainFromFormerTerminalValue() {
+        // With two retained bars the predecessor of each appended bar was the
+        // terminal bar on the previous read. Its value must survive the append, or
+        // the chain would have to recompute it after its own predecessor left the
+        // window and re-seed on every bar.
+        BarSeries moving = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        moving.setMaximumBarCount(2);
+        BarSeries unbounded = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(moving), 3);
+        EMAIndicator reference = new EMAIndicator(new ClosePriceIndicator(unbounded), 3);
+        for (int i = 0; i < 10; i++) {
+            moving.barBuilder().closePrice(10 + 3 * (i % 3)).add();
+            unbounded.barBuilder().closePrice(10 + 3 * (i % 3)).add();
+            assertNumEquals(reference.getValue(i), ema.getValue(i));
+        }
+        assertThat(ema.getValue(9).isNaN()).isFalse();
+    }
+
+    @Test
+    public void emptySeriesReturnsNaNWithoutRecursing() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        BarSeries unbounded = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(series), 1);
+
+        assertTrue(new EMAIndicator(new ClosePriceIndicator(series), 3).getValue(0).isNaN());
+        assertTrue(ema.getValue(0).isNaN());
+
+        // The empty-series read must not leave a value that later appends reuse.
+        EMAIndicator reference = new EMAIndicator(new ClosePriceIndicator(unbounded), 1);
+        for (int i = 0; i < 4; i++) {
+            series.barBuilder().closePrice(10 + i).add();
+            unbounded.barBuilder().closePrice(10 + i).add();
+        }
+        for (int i = 0; i < 4; i++) {
+            assertNumEquals(reference.getValue(i), ema.getValue(i));
+        }
+    }
+
+    @Test
+    public void removedIndexReadServesRetainedFirstAvailableValue() {
+        // A removed index maps to the first available bar. Once the chain has
+        // continued past warm-up, that bar holds a retained full-history value, and
+        // both requests must agree instead of the removed read re-seeding.
+        BarSeries moving = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        moving.setMaximumBarCount(3);
+        EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(moving), 2);
+        for (int i = 0; i < 8; i++) {
+            moving.barBuilder().closePrice(10 + 3 * (i % 3)).add();
+            ema.getValue(i);
+        }
+        int beginIndex = moving.getBeginIndex();
+        assertThat(ema.getValue(beginIndex).isNaN()).isFalse();
+        assertNumEquals(ema.getValue(beginIndex), ema.getValue(beginIndex - 1));
+        assertNumEquals(ema.getValue(beginIndex), ema.getValue(0));
+    }
+
+    @Test
+    public void readRecomputesWhenHeadAdvancesMidRead() {
+        HeadAdvancingSource.assertReadRecomputesAfterMidReadHeadAdvance(numFactory,
+                source -> new EMAIndicator(source, 2));
+    }
+
+    @Test
+    public void continuedChainKeepsFullHistoryWarmUpWhenWindowIsShorterThanWarmUp() {
+        // The window (3 bars) is shorter than the warm-up (5 bars). Warm-up is
+        // counted from where the chain was seeded, so the continued chain still
+        // turns stable at index 5 like an unbounded series; a read of a pruned
+        // index must not re-seed the live chain.
+        BarSeries moving = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        moving.setMaximumBarCount(3);
+        BarSeries unbounded = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(moving), 5);
+        EMAIndicator reference = new EMAIndicator(new ClosePriceIndicator(unbounded), 5);
+        for (int i = 0; i < 10; i++) {
+            moving.barBuilder().closePrice(10 + i * (i % 2 == 0 ? 1 : -1)).add();
+            unbounded.barBuilder().closePrice(10 + i * (i % 2 == 0 ? 1 : -1)).add();
+            if (i == 7) {
+                ema.getValue(0);
+            }
+            Num value = ema.getValue(i);
+            assertNumEquals(reference.getValue(i), value);
+            assertThat(value.isNaN()).isEqualTo(i < 5);
+        }
+    }
+
+    @Test
+    public void negativeIndexRemainsNaNDuringWarmup() {
+        EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(data), 2);
+
+        assertThat(Double.isNaN(ema.getValue(-1).doubleValue())).isTrue();
+    }
+
+    @Test
+    public void removedIndicesMapToRetainedHeadWarmupValue() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1, 2, 3, 4, 5, 6).build();
+        series.setMaximumBarCount(5);
+        EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(series), 2);
+
+        assertEquals(1, series.getBeginIndex());
+        assertThat(Double.isNaN(ema.getValue(0).doubleValue())).isTrue();
+        assertThat(Double.isNaN(ema.getValue(1).doubleValue())).isTrue();
+        assertThat(Double.isNaN(ema.getValue(2).doubleValue())).isTrue();
+        assertNumEquals(4, ema.getValue(3));
+    }
+
+    @Test
+    public void removedIndexReadRefreshesToNewRetainedHeadAfterPrune() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1, 2, 3, 4).build();
+        series.setMaximumBarCount(3);
+        EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(series), 2);
+
+        assertThat(Double.isNaN(ema.getValue(0).doubleValue())).isTrue();
+
+        series.barBuilder().endTime(series.getLastBar().getEndTime().plusSeconds(1)).closePrice(8).add();
+
+        assertEquals(2, series.getBeginIndex());
+        assertThat(Double.isNaN(ema.getValue(0).doubleValue())).isTrue();
+        assertThat(Double.isNaN(ema.getValue(series.getBeginIndex()).doubleValue())).isTrue();
+        assertNumEquals(8, ema.getValue(4));
+    }
+
+    @Test
+    public void removedIndexReadDoesNotLookAheadWhenStableBarBecomesAvailable() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1, 2, 3, 4).build();
+        series.setMaximumBarCount(3);
+        EMAIndicator ema = new EMAIndicator(new ClosePriceIndicator(series), 3);
+
+        assertThat(Double.isNaN(ema.getValue(0).doubleValue())).isTrue();
+
+        series.setMaximumBarCount(4);
+        series.barBuilder().endTime(series.getLastBar().getEndTime().plusSeconds(1)).closePrice(5).add();
+
+        assertThat(Double.isNaN(ema.getValue(0).doubleValue())).isTrue();
+        assertThat(Double.isNaN(ema.getValue(series.getBeginIndex()).doubleValue())).isTrue();
+        assertNumEquals(5, ema.getValue(4));
+    }
+
+    @Test
+    public void concurrentPruneDoesNotDeadlockRecursiveRead() throws Exception {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1, 2, 3, 4).build();
+        series.setMaximumBarCount(4);
+        CountDownLatch calculationStarted = new CountDownLatch(1);
+        CountDownLatch allowCalculation = new CountDownLatch(1);
+        AtomicBoolean blockCurrentIndex = new AtomicBoolean(true);
+        Indicator<Num> source = new AbstractIndicator<Num>(series) {
+            @Override
+            public Num getValue(int index) {
+                if (index == 3 && blockCurrentIndex.compareAndSet(true, false)) {
+                    calculationStarted.countDown();
+                    try {
+                        assertTrue(allowCalculation.await(5, TimeUnit.SECONDS),
+                                "recursive calculation was not released");
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        throw new AssertionError(e);
+                    }
+                }
+                return getBarSeries().getBar(index).getClosePrice();
+            }
+
+            @Override
+            public int getCountOfUnstableBars() {
+                return 0;
+            }
+        };
+        EMAIndicator ema = new EMAIndicator(source, 1);
+        ExecutorService executor = Executors.newFixedThreadPool(2, task -> {
+            Thread thread = new Thread(task, "ema-prune-regression");
+            thread.setDaemon(true);
+            return thread;
+        });
+        CountDownLatch resetReaderStarted = new CountDownLatch(1);
+        AtomicReference<Thread> resetReaderThread = new AtomicReference<>();
+
+        try {
+            Future<Num> recursiveRead = executor.submit(() -> ema.getValue(3));
+            assertTrue(calculationStarted.await(5, TimeUnit.SECONDS), "recursive calculation never started");
+            series.barBuilder().endTime(series.getLastBar().getEndTime().plusSeconds(1)).closePrice(5).add();
+
+            Future<Num> resetRead = executor.submit(() -> {
+                resetReaderThread.set(Thread.currentThread());
+                resetReaderStarted.countDown();
+                return ema.getValue(4);
+            });
+            assertTrue(resetReaderStarted.await(5, TimeUnit.SECONDS), "reset reader never started");
+
+            long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+            Thread.State resetReaderState;
+            do {
+                resetReaderState = resetReaderThread.get().getState();
+                if (resetReaderState == Thread.State.BLOCKED || resetReaderState == Thread.State.WAITING
+                        || resetReaderState == Thread.State.TIMED_WAITING) {
+                    break;
+                }
+                Thread.onSpinWait();
+            } while (System.nanoTime() < deadline);
+            assertThat(resetReaderState).isIn(Thread.State.BLOCKED, Thread.State.WAITING, Thread.State.TIMED_WAITING);
+
+            allowCalculation.countDown();
+            assertNumEquals(4, recursiveRead.get(5, TimeUnit.SECONDS));
+            assertNumEquals(5, resetRead.get(5, TimeUnit.SECONDS));
+        } finally {
+            allowCalculation.countDown();
+            executor.shutdownNow();
+        }
     }
 
     @Test
@@ -244,13 +489,13 @@ public class EMAIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num>
         // Recovery: EMA resets to the first stable RSI value instead of remaining NaN
         assertThat(emaOnRsi.getValue(3)).isEqualByComparingTo(firstRsiValue);
 
-        Num multiplier = numFactory.two().dividedBy(numFactory.numOf(emaOnRsi.getBarCount() + 1));
-
-        Num expectedIndex4 = firstRsiValue.plus(rsi.getValue(4).minus(firstRsiValue).multipliedBy(multiplier));
-        assertThat(emaOnRsi.getValue(4)).isEqualByComparingTo(expectedIndex4);
-
-        Num expectedIndex5 = expectedIndex4.plus(rsi.getValue(5).minus(expectedIndex4).multipliedBy(multiplier));
-        assertThat(emaOnRsi.getValue(5)).isEqualByComparingTo(expectedIndex5);
+        // Independently computed reference values: Wilder RSI(3) on the closes
+        // [1,2,3,4,3,4,5] gives RSI(4) = 100 - 100/(1 + (2/3)/(1/3)) = 66.666..., so
+        // EMA(4) = 100 + (66.666... - 100) * 2/3 = 77.777...; RSI(5) equals 77.777...,
+        // so the recurrence leaves EMA(5) = EMA(4) = 77.777... (agreed by both Num
+        // factories within GENERAL_OFFSET).
+        assertNumEquals(77.7778, emaOnRsi.getValue(4));
+        assertNumEquals(77.7778, emaOnRsi.getValue(5));
     }
 
     @Test

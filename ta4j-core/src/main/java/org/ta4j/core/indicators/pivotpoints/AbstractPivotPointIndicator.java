@@ -9,7 +9,7 @@ import java.util.List;
 
 import org.ta4j.core.Bar;
 import org.ta4j.core.BarSeries;
-import org.ta4j.core.indicators.RecursiveCachedIndicator;
+import org.ta4j.core.indicators.CachedIndicator;
 import org.ta4j.core.num.Num;
 
 /**
@@ -22,7 +22,7 @@ import org.ta4j.core.num.Num;
  *
  * @since 0.20
  */
-public abstract class AbstractPivotPointIndicator extends RecursiveCachedIndicator<Num> {
+public abstract class AbstractPivotPointIndicator extends CachedIndicator<Num> {
 
     /** The time level for pivot calculation. */
     protected final TimeLevel timeLevel;
@@ -151,4 +151,61 @@ public abstract class AbstractPivotPointIndicator extends RecursiveCachedIndicat
             return zonedEndTime.minusYears(1).getYear();
         }
     }
+
+    /**
+     * A head advance can truncate the first retained calendar period and thereby
+     * change pivot values in both that period and the following period. The second
+     * following period reads only the intact following period, so its cached values
+     * remain valid. Bar-based pivots only read the preceding bar.
+     *
+     * @param firstRetainedIndex the first series index that remains available
+     * @return the first cache index independent of evicted bars
+     */
+    @Override
+    protected int minimumCacheableIndexAfterHeadAdvance(int firstRetainedIndex) {
+        if (timeLevel == TimeLevel.BARBASED) {
+            return firstRetainedIndex == Integer.MAX_VALUE ? Integer.MAX_VALUE : firstRetainedIndex + 1;
+        }
+        return firstIndexAfterAffectedCalendarPeriods(firstRetainedIndex);
+    }
+
+    /**
+     * When the period following the truncated one contains the latest bar, the
+     * pivot values still being appended are rebaselined against the truncated
+     * period. Declaring that as an explicit full invalidation resets recursive
+     * consumers, which cannot continue a chain across the changed values; earlier
+     * affected periods only re-evaluate values a consumer already read.
+     *
+     * @return {@code true} when the affected calendar periods reach the latest bar
+     */
+    @Override
+    protected boolean requiresFullCacheInvalidationAfterHeadAdvance() {
+        int firstRetainedIndex = getBarSeries().getBeginIndex();
+        if (timeLevel == TimeLevel.BARBASED || firstRetainedIndex < 0) {
+            return false;
+        }
+        return firstIndexAfterAffectedCalendarPeriods(firstRetainedIndex) == Integer.MAX_VALUE;
+    }
+
+    private int firstIndexAfterAffectedCalendarPeriods(int firstRetainedIndex) {
+        int endIndex = getBarSeries().getEndIndex();
+        if (firstRetainedIndex >= endIndex) {
+            return Integer.MAX_VALUE;
+        }
+        int index = firstRetainedIndex;
+        long firstPeriod = getPeriod(getBarSeries().getBar(index));
+        while (index < endIndex && getPeriod(getBarSeries().getBar(index + 1)) == firstPeriod) {
+            index++;
+        }
+        if (index == endIndex) {
+            return Integer.MAX_VALUE;
+        }
+        index++;
+        long followingPeriod = getPeriod(getBarSeries().getBar(index));
+        while (index < endIndex && getPeriod(getBarSeries().getBar(index + 1)) == followingPeriod) {
+            index++;
+        }
+        return index == endIndex ? Integer.MAX_VALUE : index + 1;
+    }
+
 }

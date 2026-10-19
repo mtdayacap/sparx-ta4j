@@ -3,18 +3,24 @@
  */
 package org.ta4j.core.indicators;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
 import java.time.Instant;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.ExternalIndicatorTest;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.TestUtils;
+import org.ta4j.core.indicators.averages.SMAIndicator;
+import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
+import org.ta4j.core.indicators.helpers.HighPriceIndicator;
+import org.ta4j.core.indicators.helpers.LowPriceIndicator;
+import org.ta4j.core.indicators.helpers.TRIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.num.NumFactory;
@@ -34,7 +40,7 @@ public class ATRIndicatorTest extends AbstractIndicatorTest<BarSeries, Num> {
         var now = Instant.now();
         series.addBar(series.barBuilder()
                 .endTime(now.minusSeconds(5))
-                .openPrice(0)
+                .openPrice(8)
                 .closePrice(12)
                 .highPrice(15)
                 .lowPrice(8)
@@ -43,7 +49,7 @@ public class ATRIndicatorTest extends AbstractIndicatorTest<BarSeries, Num> {
                 .build());
         series.barBuilder()
                 .endTime(now.minusSeconds(4))
-                .openPrice(0)
+                .openPrice(6)
                 .closePrice(8)
                 .highPrice(11)
                 .lowPrice(6)
@@ -53,7 +59,7 @@ public class ATRIndicatorTest extends AbstractIndicatorTest<BarSeries, Num> {
                 .add();
         series.barBuilder()
                 .endTime(now.minusSeconds(3))
-                .openPrice(0)
+                .openPrice(14)
                 .closePrice(15)
                 .highPrice(17)
                 .lowPrice(14)
@@ -63,7 +69,7 @@ public class ATRIndicatorTest extends AbstractIndicatorTest<BarSeries, Num> {
                 .add();
         series.barBuilder()
                 .endTime(now.minusSeconds(2))
-                .openPrice(0)
+                .openPrice(14)
                 .closePrice(15)
                 .highPrice(17)
                 .lowPrice(14)
@@ -76,7 +82,7 @@ public class ATRIndicatorTest extends AbstractIndicatorTest<BarSeries, Num> {
                 .openPrice(0)
                 .closePrice(0)
                 .highPrice(0)
-                .lowPrice(2)
+                .lowPrice(0)
                 .volume(0)
                 .amount(0)
                 .trades(0)
@@ -142,5 +148,144 @@ public class ATRIndicatorTest extends AbstractIndicatorTest<BarSeries, Num> {
         for (int i = series.getBeginIndex(); i <= series.getEndIndex(); i++) {
             assertNumEquals(indicator.getValue(i), restored.getValue(i));
         }
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    public void customTrueRangeSerializationRoundTripPreservesSource() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        series.barBuilder().openPrice(8).closePrice(12).highPrice(15).lowPrice(8).add();
+        series.barBuilder().openPrice(6).closePrice(8).highPrice(11).lowPrice(6).add();
+        series.barBuilder().openPrice(14).closePrice(15).highPrice(17).lowPrice(14).add();
+        series.barBuilder().openPrice(15).closePrice(16).highPrice(18).lowPrice(15).add();
+        series.barBuilder().openPrice(13).closePrice(14).highPrice(17).lowPrice(13).add();
+        series.barBuilder().openPrice(16).closePrice(18).highPrice(19).lowPrice(16).add();
+        Indicator<Num> delayedClose = new SMAIndicator(new ClosePriceIndicator(series), 2);
+        TRIndicator trueRange = new TRIndicator(new HighPriceIndicator(series), new LowPriceIndicator(series),
+                delayedClose);
+        ATRIndicator indicator = new ATRIndicator(trueRange, 3);
+        ATRIndicator defaultIndicator = new ATRIndicator(series, 3);
+
+        String json = indicator.toJson();
+        Indicator<Num> restored = (Indicator<Num>) Indicator.fromJson(series, json);
+
+        assertFalse(indicator.getValue(5).isEqual(defaultIndicator.getValue(5)));
+        assertEquals(indicator.toDescriptor(), restored.toDescriptor());
+        for (int i = series.getBeginIndex(); i <= series.getEndIndex(); i++) {
+            assertNumEquals(indicator.getValue(i), restored.getValue(i));
+        }
+    }
+
+    @Test
+    public void getTRIndicatorReturnsIndependentHelper() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).withDefaultData().build();
+        ATRIndicator indicator = new ATRIndicator(series, 3);
+
+        TRIndicator first = indicator.getTRIndicator();
+        TRIndicator second = indicator.getTRIndicator();
+
+        assertNotSame(first, second);
+        assertTrue(IndicatorUtils.isSameSeries(series, first.getBarSeries()));
+        assertNumEquals(first.getValue(series.getEndIndex()), second.getValue(series.getEndIndex()));
+    }
+
+    @Test
+    public void customTrueRangeUnstableBarsAreRetained() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        series.barBuilder().openPrice(8).closePrice(12).highPrice(15).lowPrice(8).add();
+        series.barBuilder().openPrice(6).closePrice(8).highPrice(11).lowPrice(6).add();
+        series.barBuilder().openPrice(14).closePrice(15).highPrice(17).lowPrice(14).add();
+        series.barBuilder().openPrice(15).closePrice(16).highPrice(18).lowPrice(15).add();
+        series.barBuilder().openPrice(13).closePrice(14).highPrice(17).lowPrice(13).add();
+        series.barBuilder().openPrice(16).closePrice(18).highPrice(19).lowPrice(16).add();
+        Indicator<Num> delayedClose = new SMAIndicator(new ClosePriceIndicator(series), 2);
+        TRIndicator trueRange = new TRIndicator(new HighPriceIndicator(series), new LowPriceIndicator(series),
+                delayedClose);
+
+        ATRIndicator indicator = new ATRIndicator(trueRange, 3);
+
+        assertEquals(5, indicator.getCountOfUnstableBars());
+        assertTrue(Num.isNaNOrNull(indicator.getValue(4)));
+        assertFalse(Num.isNaNOrNull(indicator.getValue(5)));
+    }
+
+    @Test
+    public void headAdvanceKeepsAverageTrueRangeChainWhileFreshIndicatorReseedsAtRetainedHead() {
+        // Retained average true ranges are full-history values (#1666): a head
+        // advance keeps them instead of rebuilding from the first retained bar.
+        // Only an indicator without cached predecessors re-seeds at the head,
+        // where the first retained true range loses its previous close.
+        BarSeries series = steppedSeries();
+        BarSeries unbounded = steppedSeries();
+        ATRIndicator atr = new ATRIndicator(series, 2);
+        atr.getValue(5);
+
+        series.setMaximumBarCount(3);
+        assertEquals(3, series.getBeginIndex());
+
+        ATRIndicator reference = new ATRIndicator(unbounded, 2);
+        for (int i = 3; i <= 5; i++) {
+            assertNumEquals(reference.getValue(i), atr.getValue(i));
+        }
+        assertNumEquals(10, atr.getValue(3));
+
+        ATRIndicator fresh = new ATRIndicator(series, 2);
+        assertTrue(fresh.getValue(3).isNaN());
+        assertTrue(fresh.getValue(4).isNaN());
+        assertNumEquals(10, fresh.getValue(5));
+    }
+
+    private BarSeries steppedSeries() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        for (int i = 0; i <= 5; i++) {
+            int price = i * 10;
+            series.barBuilder().openPrice(price).closePrice(price).highPrice(price).lowPrice(price - 3).add();
+        }
+        return series;
+    }
+
+    @Test
+    public void headAdvanceContinuesChainAboveItsOwnUnstableFloor() {
+        // The alternating true ranges keep the smoothed value sensitive to where
+        // the chain started. After a head advance, appended bars must extend the
+        // retained full-history chain (matching an unbounded series) instead of
+        // a chain rebuilt from the retained head.
+        BarSeries series = alternatingSeries(19);
+        BarSeries unbounded = alternatingSeries(19);
+        ATRIndicator atr = new ATRIndicator(series, 2);
+        atr.getValue(19);
+
+        series.setMaximumBarCount(6);
+        assertEquals(14, series.getBeginIndex());
+        addAlternatingBar(series, 20);
+        addAlternatingBar(unbounded, 20);
+
+        ATRIndicator reference = new ATRIndicator(unbounded, 2);
+        ATRIndicator fresh = new ATRIndicator(series, 2);
+        for (int i = 15; i <= 20; i++) {
+            assertNumEquals(reference.getValue(i), atr.getValue(i));
+        }
+        // A fresh indicator seeds at the retained head (bar 15) and warms up from
+        // there, so its first stable value at bar 17 is that bar's true range.
+        assertNumEquals(17, fresh.getValue(17));
+        assertFalse(atr.getValue(17).isEqual(fresh.getValue(17)));
+    }
+
+    private BarSeries alternatingSeries(int lastIndex) {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        for (int i = 0; i <= lastIndex; i++) {
+            addAlternatingBar(series, i);
+        }
+        return series;
+    }
+
+    private static void addAlternatingBar(BarSeries series, int i) {
+        int closePrice = i * 10 + 5 * (i % 2);
+        series.barBuilder()
+                .openPrice(closePrice)
+                .closePrice(closePrice)
+                .highPrice(closePrice + 2)
+                .lowPrice(closePrice - 2)
+                .add();
     }
 }

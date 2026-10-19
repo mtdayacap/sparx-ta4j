@@ -4,11 +4,11 @@
 package org.ta4j.core.indicators;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.ta4j.core.num.NaN.NaN;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.helpers.HighPriceIndicator;
@@ -26,7 +26,7 @@ public class MarketFacilitationIndexIndicatorTest extends AbstractIndicatorTest<
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
     }
@@ -35,7 +35,7 @@ public class MarketFacilitationIndexIndicatorTest extends AbstractIndicatorTest<
     public void shouldComputePriceRangePerVolume() {
         series.barBuilder().openPrice(10).closePrice(10).highPrice(12).lowPrice(10).volume(4).add(); // 0.5
         series.barBuilder().openPrice(10).closePrice(10).highPrice(15).lowPrice(9).volume(3).add(); // 2.0
-        series.barBuilder().openPrice(10).closePrice(10).highPrice(20).lowPrice(16).volume(8).add(); // 0.5
+        series.barBuilder().openPrice(16).closePrice(16).highPrice(20).lowPrice(16).volume(8).add(); // 0.5
 
         final var indicator = new MarketFacilitationIndexIndicator(series);
 
@@ -159,7 +159,7 @@ public class MarketFacilitationIndexIndicatorTest extends AbstractIndicatorTest<
     public void serializationRoundTrip() {
         series.barBuilder().openPrice(10).closePrice(10).highPrice(12).lowPrice(10).volume(4).add();
         series.barBuilder().openPrice(10).closePrice(10).highPrice(15).lowPrice(9).volume(3).add();
-        series.barBuilder().openPrice(10).closePrice(10).highPrice(20).lowPrice(16).volume(8).add();
+        series.barBuilder().openPrice(16).closePrice(16).highPrice(20).lowPrice(16).volume(8).add();
 
         final var original = new MarketFacilitationIndexIndicator(series);
         for (int i = series.getBeginIndex(); i <= series.getEndIndex(); i++) {
