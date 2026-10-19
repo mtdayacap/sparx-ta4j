@@ -3,9 +3,15 @@
  */
 package org.ta4j.core.indicators;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+import org.ta4j.core.BarSeries;
+
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
@@ -41,4 +47,13 @@ public class CoppockCurveIndicatorTest extends AbstractIndicatorTest<Indicator<N
         assertNumEquals(7.4532, cc.getValue(38));
         assertNumEquals(8.79, cc.getValue(39));
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+
+        return List.of(serializationFixture(series, new CoppockCurveIndicator(close, 5, 3, 4), stableIndexes(series)));
+    }
+
 }

@@ -3,7 +3,7 @@
  */
 package org.ta4j.core.indicators;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
@@ -12,7 +12,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import static org.junit.Assert.*;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for {@link CachedBuffer}.
@@ -21,7 +21,7 @@ public class CachedBufferTest {
 
     @Test
     public void testBasicGetOrCompute() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(10);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
         AtomicInteger computations = new AtomicInteger(0);
 
         Integer result = buffer.getOrCompute(5, i -> {
@@ -43,11 +43,136 @@ public class CachedBufferTest {
     }
 
     @Test
+    public void testSynchronizeShrinksAndLazilyRegrowsCapacity() {
+        CachedBuffer<Integer> buffer = CachedBuffer.of(Integer.MAX_VALUE);
+        for (int i = 0; i < 10; i++) {
+            buffer.put(i, i);
+        }
+
+        assertEquals(9, buffer.synchronize(5, 3, -1));
+        assertEquals(7, buffer.getFirstCachedIndex());
+        assertNull(buffer.get(6));
+        assertEquals(Integer.valueOf(7), buffer.get(7));
+        assertEquals(Integer.valueOf(9), buffer.get(9));
+
+        buffer.synchronize(7, 6, -1);
+        buffer.put(10, 10);
+        buffer.put(6, 6);
+
+        assertEquals(6, buffer.getFirstCachedIndex());
+        assertEquals(10, buffer.getHighestResultIndex());
+        for (int i = 6; i <= 10; i++) {
+            assertEquals(Integer.valueOf(i), buffer.get(i));
+        }
+    }
+
+    @Test
+    public void testSynchronizeInvalidatesTailAndDiscardsRemovedPrefix() {
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
+        for (int i = 0; i < 8; i++) {
+            buffer.put(i, i);
+        }
+
+        assertEquals(4, buffer.synchronize(2, 10, 5));
+        assertEquals(2, buffer.getFirstCachedIndex());
+        assertEquals(Integer.valueOf(2), buffer.get(2));
+        assertEquals(Integer.valueOf(4), buffer.get(4));
+        assertNull(buffer.get(5));
+
+        buffer.put(5, 50);
+        assertEquals(Integer.valueOf(50), buffer.get(5));
+        assertNull(buffer.get(6));
+    }
+
+    @Test
+    public void testAdjacentReverseExpansionPreservesOverlappingValues() {
+        CachedBuffer<Integer> buffer = CachedBuffer.of(4);
+        for (int i = 6; i <= 9; i++) {
+            buffer.put(i, i);
+        }
+
+        for (int i = 5; i >= 0; i--) {
+            buffer.put(i, i);
+            assertEquals(i, buffer.getFirstCachedIndex());
+            assertEquals(i + 3, buffer.getHighestResultIndex());
+            for (int retained = i; retained <= i + 3; retained++) {
+                assertEquals(Integer.valueOf(retained), buffer.get(retained));
+            }
+        }
+    }
+
+    @Test
+    public void testFullInvalidationReleasesExpandedStorageAndRegrowsLazily() {
+        CachedBuffer<Object> buffer = CachedBuffer.of(Integer.MAX_VALUE);
+        for (int i = 0; i < 600; i++) {
+            buffer.put(i, new Object());
+        }
+        assertEquals(1024, buffer.getCapacity());
+
+        buffer.invalidateFrom(0);
+
+        assertEquals(512, buffer.getCapacity());
+        assertEquals(-1, buffer.getFirstCachedIndex());
+        assertEquals(-1, buffer.getHighestResultIndex());
+        for (int i = 0; i < 600; i++) {
+            assertFalse(buffer.isCached(i));
+        }
+
+        for (int i = 0; i < 600; i++) {
+            buffer.put(i, new Object());
+        }
+        assertEquals(1024, buffer.getCapacity());
+    }
+
+    @Test
+    public void testSynchronizeClearsWhenRetentionPassesCachedRange() {
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
+        for (int i = 0; i < 5; i++) {
+            buffer.put(i, i);
+        }
+
+        assertEquals(-1, buffer.synchronize(9, 10, -1));
+
+        assertEquals(-1, buffer.getFirstCachedIndex());
+        assertEquals(-1, buffer.getHighestResultIndex());
+        assertFalse(buffer.isCached(4));
+    }
+
+    @Test
+    public void testGetOrElseDistinguishesMissingFromCachedNull() {
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
+        buffer.put(3, 30);
+        buffer.put(4, null);
+
+        assertEquals(30, buffer.getOrElse(3, () -> -1));
+        assertNull(buffer.getOrElse(4, () -> -1));
+        assertEquals(-1, buffer.getOrElse(5, () -> -1));
+
+        buffer.synchronize(4, 10, -1);
+
+        assertEquals(-1, buffer.getOrElse(3, () -> -1));
+    }
+
+    @Test
+    public void testSynchronizeClearsWhenChangeIsAtOrBelowFirstCachedIndex() {
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
+        for (int i = 3; i < 8; i++) {
+            buffer.put(i, i);
+        }
+
+        assertEquals(-1, buffer.synchronize(3, 10, 3));
+
+        assertEquals(-1, buffer.getFirstCachedIndex());
+        assertEquals(-1, buffer.getHighestResultIndex());
+        assertFalse(buffer.isCached(7));
+    }
+
+    @Test
     public void testWriteStampFlipsDuringWriteLockAndReturnsEvenAfterwards() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(10);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
 
         long initialStamp = buffer.getWriteStamp();
-        assertEquals("writeStamp should start even", 0L, initialStamp & 1L);
+        assertEquals(0L, initialStamp & 1L, "writeStamp should start even");
 
         AtomicLong stampDuringWrite = new AtomicLong(Long.MIN_VALUE);
         buffer.prefillUntil(0, 1, i -> {
@@ -56,17 +181,34 @@ public class CachedBufferTest {
         });
 
         long capturedStamp = stampDuringWrite.get();
-        assertEquals("writeStamp should be odd while write lock held", 1L, capturedStamp & 1L);
+        assertEquals(1L, capturedStamp & 1L, "writeStamp should be odd while write lock held");
 
         long finalStamp = buffer.getWriteStamp();
-        assertEquals("writeStamp should be even after write completes", 0L, finalStamp & 1L);
-        assertEquals("Outer write lock should flip stamp twice", initialStamp + 2L, finalStamp);
+        assertEquals(0L, finalStamp & 1L, "writeStamp should be even after write completes");
+        assertEquals(initialStamp + 2L, finalStamp, "Outer write lock should flip stamp twice");
+    }
+
+    @Test
+    public void testPrefillUntilReleasesWriteLockAndRestoresEvenStampWhenCalculatorThrows() {
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
+
+        assertThrows(IllegalStateException.class, () -> buffer.prefillUntil(0, 2, i -> {
+            if (i == 1) {
+                throw new IllegalStateException("boom");
+            }
+            return i;
+        }));
+
+        assertFalse(buffer.isWriteLockedByCurrentThread(), "write lock should be released after exception");
+        assertEquals(0L, buffer.getWriteStamp() & 1L, "writeStamp should return to an even value after exception");
+        assertEquals(Integer.valueOf(0), buffer.get(0), "successful values before the exception should remain cached");
+        assertNull(buffer.get(1), "failed index should not be cached");
     }
 
     @Test
     public void testRingBufferEvictionWithSmallCapacity() {
         // Test with small maximumBarCount (3) and >10 bars to verify wraparound
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(3);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(3);
         AtomicInteger computations = new AtomicInteger(0);
 
         // Fill indices 0, 1, 2
@@ -122,7 +264,7 @@ public class CachedBufferTest {
 
     @Test
     public void testConcurrentAccessSingleComputationPerIndex() throws InterruptedException {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(100);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(100);
         AtomicInteger computations = new AtomicInteger(0);
 
         int threads = 8;
@@ -156,16 +298,16 @@ public class CachedBufferTest {
 
         ready.await();
         start.countDown();
-        assertTrue("Concurrent tasks did not finish in time", done.await(5, TimeUnit.SECONDS));
+        assertTrue(done.await(5, TimeUnit.SECONDS), "Concurrent tasks did not finish in time");
         executor.shutdownNow();
 
         // Only one computation should occur despite concurrent access
-        assertEquals("Only one computation should be performed for the same index", 1, computations.get());
+        assertEquals(1, computations.get(), "Only one computation should be performed for the same index");
     }
 
     @Test
     public void testPrefillUntil() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(100);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(100);
         AtomicInteger computations = new AtomicInteger(0);
 
         // Prefill 0 to 9 (exclusive of 10)
@@ -196,8 +338,41 @@ public class CachedBufferTest {
     }
 
     @Test
+    public void testPrefillUntilFillsHolesFromFirstMissingIndex() {
+        CachedBuffer<Integer> buffer = CachedBuffer.of(64);
+
+        for (int i = 0; i < 100; i++) {
+            buffer.put(i, i);
+        }
+        // A backward read truncates the retained tail, leaving the hole [11, 35]
+        // inside the represented [10, 73] range.
+        buffer.put(10, 10);
+
+        assertFalse(buffer.isCached(20));
+        assertTrue(buffer.isCached(50));
+        assertEquals(11, buffer.firstMissingIndex(10, 40));
+
+        // A prefill starting inside the hole must fill it, not jump past the
+        // reported highest index and skip the gap. Only the range at or above
+        // the requested start index is filled: the caller routes the gap below
+        // it through firstMissingIndex, as getValue does.
+        buffer.prefillUntil(15, 40, i -> i);
+
+        assertTrue(buffer.isCached(20));
+        assertEquals(Integer.valueOf(20), buffer.get(20));
+        assertTrue(buffer.isCached(39));
+        assertEquals(Integer.valueOf(50), buffer.get(50));
+        assertEquals(11, buffer.firstMissingIndex(10, 73));
+
+        // A prefill rooted at the first missing index completes the whole hole.
+        buffer.prefillUntil(11, 40, i -> i);
+
+        assertEquals(-1, buffer.firstMissingIndex(10, 73));
+    }
+
+    @Test
     public void testClear() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(10);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
 
         buffer.put(0, 100);
         buffer.put(1, 200);
@@ -217,7 +392,7 @@ public class CachedBufferTest {
 
     @Test
     public void testInvalidateFrom() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(10);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
 
         for (int i = 0; i < 5; i++) {
             buffer.put(i, i * 10);
@@ -244,7 +419,7 @@ public class CachedBufferTest {
 
     @Test
     public void testInvalidateFromNegativeClearsAll() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(10);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
 
         buffer.put(0, 100);
         buffer.put(1, 200);
@@ -257,7 +432,7 @@ public class CachedBufferTest {
 
     @Test
     public void testInvalidateFromBeyondHighestIsNoOp() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(10);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
 
         buffer.put(0, 100);
         buffer.put(1, 200);
@@ -272,7 +447,7 @@ public class CachedBufferTest {
 
     @Test
     public void testUnboundedBufferGrows() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(Integer.MAX_VALUE);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(Integer.MAX_VALUE);
 
         // Store values at large indices
         buffer.put(0, 0);
@@ -286,7 +461,7 @@ public class CachedBufferTest {
 
     @Test
     public void testIsInRange() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(10);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
 
         assertFalse(buffer.isInRange(0));
 
@@ -304,7 +479,7 @@ public class CachedBufferTest {
     public void testStoreBeforeFirstCachedIndexInBoundedBuffer() {
         // Test storing an index before firstCachedIndex in a bounded buffer
         // This is the bug case: the slot mapping becomes inconsistent
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(5);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(5);
 
         // First, store values at indices 10, 11, 12, 13, 14 (fills capacity)
         for (int i = 10; i < 15; i++) {
@@ -335,17 +510,17 @@ public class CachedBufferTest {
         // rebuilt)
         // They should NOT be wrong values due to slot mapping inconsistency
         if (val10 != null) {
-            assertEquals("Value at index 10 should be correct if still cached", Integer.valueOf(1000), val10);
+            assertEquals(Integer.valueOf(1000), val10, "Value at index 10 should be correct if still cached");
         }
         if (val11 != null) {
-            assertEquals("Value at index 11 should be correct if still cached", Integer.valueOf(1100), val11);
+            assertEquals(Integer.valueOf(1100), val11, "Value at index 11 should be correct if still cached");
         }
     }
 
     @Test
     public void testStoreBeforeFirstCachedIndexWithEviction() {
         // Bounded buffer with backward insert should rebuild to avoid stale slots
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(3);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(3);
 
         // Store at indices 5, 6, 7 (fills capacity of 3)
         buffer.put(5, 500);
@@ -370,15 +545,15 @@ public class CachedBufferTest {
         Integer val3 = buffer.get(3);
         Integer val4 = buffer.get(4);
         // Indices 3 and 4 were never stored, so they must be null
-        assertNull("Index 3 was never stored, should be null", val3);
-        assertNull("Index 4 was never stored, should be null", val4);
+        assertNull(val3, "Index 3 was never stored, should be null");
+        assertNull(val4, "Index 4 was never stored, should be null");
     }
 
     @Test
     public void testStoreBeforeFirstCachedIndexSlotMappingConsistency() {
         // This test specifically verifies that slot mapping remains consistent
         // after storing before firstCachedIndex
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(3);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(3);
 
         // Store at indices 5, 6, 7
         // Slot mapping: index 5 -> slot 0, index 6 -> slot 1, index 7 -> slot 2
@@ -395,15 +570,15 @@ public class CachedBufferTest {
         buffer.put(3, 333);
 
         // The value we just stored should be correct (slot 0 was overwritten)
-        assertEquals("Value at index 3 should be what we stored", Integer.valueOf(333), buffer.get(3));
+        assertEquals(Integer.valueOf(333), buffer.get(3), "Value at index 3 should be what we stored");
 
         Integer val4 = buffer.get(4);
-        assertNull("Index 4 was never stored, must be null (not stale value from old index 6)", val4);
+        assertNull(val4, "Index 4 was never stored, must be null (not stale value from old index 6)");
 
         if (buffer.isInRange(5)) {
             Integer val5 = buffer.get(5);
             if (val5 != null) {
-                assertEquals("Index 5 should have its original value 555, not stale 777", Integer.valueOf(555), val5);
+                assertEquals(Integer.valueOf(555), val5, "Index 5 should have its original value 555, not stale 777");
             }
         }
     }
@@ -411,7 +586,7 @@ public class CachedBufferTest {
     @Test
     public void testNullValueCaching() {
         // Test that null values are cached correctly and not recomputed
-        CachedBuffer<String> buffer = new CachedBuffer<>(10);
+        CachedBuffer<String> buffer = CachedBuffer.of(10);
         AtomicInteger computations = new AtomicInteger(0);
 
         // First call: compute null value
@@ -420,8 +595,8 @@ public class CachedBufferTest {
             return null; // Legitimate null return value
         });
 
-        assertNull("First call should return null", result1);
-        assertEquals("Should have computed once", 1, computations.get());
+        assertNull(result1, "First call should return null");
+        assertEquals(1, computations.get(), "Should have computed once");
 
         // Second call: should use cached null, not recompute
         String result2 = buffer.getOrCompute(5, i -> {
@@ -429,53 +604,53 @@ public class CachedBufferTest {
             return null;
         });
 
-        assertNull("Second call should return cached null", result2);
-        assertEquals("Should not recompute - null is cached", 1, computations.get());
+        assertNull(result2, "Second call should return cached null");
+        assertEquals(1, computations.get(), "Should not recompute - null is cached");
 
         // Verify get() also returns cached null
         String result3 = buffer.get(5);
-        assertNull("get() should return cached null", result3);
+        assertNull(result3, "get() should return cached null");
     }
 
     @Test
     public void testIsCachedDistinguishesNotComputedFromCachedNull() {
-        CachedBuffer<String> buffer = new CachedBuffer<>(10);
+        CachedBuffer<String> buffer = CachedBuffer.of(10);
 
         // Index 5 has not been computed yet
-        assertFalse("Index 5 should not be cached initially", buffer.isCached(5));
-        assertNull("get() should return null for not-computed index", buffer.get(5));
+        assertFalse(buffer.isCached(5), "Index 5 should not be cached initially");
+        assertNull(buffer.get(5), "get() should return null for not-computed index");
 
         // Cache a null value at index 5
         buffer.getOrCompute(5, i -> null);
 
         // Now index 5 is cached (with null value)
-        assertTrue("Index 5 should be cached after computation", buffer.isCached(5));
-        assertNull("get() should still return null for cached null value", buffer.get(5));
+        assertTrue(buffer.isCached(5), "Index 5 should be cached after computation");
+        assertNull(buffer.get(5), "get() should still return null for cached null value");
 
         // Index 6 is still not cached
-        assertFalse("Index 6 should not be cached", buffer.isCached(6));
+        assertFalse(buffer.isCached(6), "Index 6 should not be cached");
     }
 
     @Test
     public void testIsCachedWithNonNullValues() {
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(10);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
 
-        assertFalse("Index should not be cached initially", buffer.isCached(3));
+        assertFalse(buffer.isCached(3), "Index should not be cached initially");
 
         buffer.put(3, 300);
 
-        assertTrue("Index should be cached after put", buffer.isCached(3));
+        assertTrue(buffer.isCached(3), "Index should be cached after put");
         assertEquals(Integer.valueOf(300), buffer.get(3));
 
         // Out-of-range index
-        assertFalse("Out-of-range index should not be cached", buffer.isCached(100));
+        assertFalse(buffer.isCached(100), "Out-of-range index should not be cached");
     }
 
     @Test
     public void testConcurrentBufferGrowthStress() throws InterruptedException {
         // Stress test: multiple threads concurrently writing to an unbounded buffer
         // that must grow. Modest thread count is sufficient to expose race conditions.
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(Integer.MAX_VALUE);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(Integer.MAX_VALUE);
         int threads = 8;
         int operationsPerThread = 200;
         AtomicInteger computations = new AtomicInteger(0);
@@ -510,11 +685,11 @@ public class CachedBufferTest {
 
         ready.await();
         start.countDown();
-        assertTrue("Stress test did not complete in time", done.await(60, TimeUnit.SECONDS));
+        assertTrue(done.await(60, TimeUnit.SECONDS), "Stress test did not complete in time");
         executor.shutdownNow();
 
         // All indices should have been computed exactly once
-        assertEquals("Each index should be computed exactly once", threads * operationsPerThread, computations.get());
+        assertEquals(threads * operationsPerThread, computations.get(), "Each index should be computed exactly once");
 
         // Verify all values are correct
         for (int t = 0; t < threads; t++) {
@@ -522,7 +697,7 @@ public class CachedBufferTest {
             for (int i = 0; i < operationsPerThread; i++) {
                 int index = baseIndex + i;
                 Integer value = buffer.get(index);
-                assertEquals("Value at index " + index + " should be correct", Integer.valueOf(index * 2), value);
+                assertEquals(Integer.valueOf(index * 2), value, "Value at index " + index + " should be correct");
             }
         }
     }
@@ -531,7 +706,7 @@ public class CachedBufferTest {
     public void testConcurrentReadWriteStress() throws InterruptedException {
         // Stress test: mix of readers and writers operating concurrently.
         // Moderate iteration count catches race conditions without excessive runtime.
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(100);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(100);
         int threads = 8;
         int iterationsPerThread = 500;
         AtomicInteger computations = new AtomicInteger(0);
@@ -582,14 +757,14 @@ public class CachedBufferTest {
 
         ready.await();
         start.countDown();
-        assertTrue("Mixed read/write stress test did not complete in time", done.await(60, TimeUnit.SECONDS));
+        assertTrue(done.await(60, TimeUnit.SECONDS), "Mixed read/write stress test did not complete in time");
         executor.shutdownNow();
 
         // Verify buffer integrity: all cached values should be consistent
         for (int i = 0; i < 100; i++) {
             Integer value = buffer.get(i);
             if (value != null) {
-                assertEquals("Cached value at index " + i + " should be index * 10", Integer.valueOf(i * 10), value);
+                assertEquals(Integer.valueOf(i * 10), value, "Cached value at index " + i + " should be index * 10");
             }
         }
     }
@@ -599,7 +774,7 @@ public class CachedBufferTest {
         // Test case for bug: when a large gap requires evicting more items than
         // actually cached, firstCachedIndex was advanced by the calculated evictCount
         // instead of the actual number of evicted items, corrupting the range.
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(5);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(5);
 
         // Cache values at indices 0, 1, 2 (3 entries, capacity is 5)
         buffer.put(0, 1000);
@@ -630,8 +805,8 @@ public class CachedBufferTest {
         // firstCachedIndex should be set to the new index (100), not an incorrect
         // value derived from adding evictCount to the old firstCachedIndex.
         // BUG: firstCachedIndex would be 96 (0 + 96) instead of 100
-        assertEquals("When all entries are evicted by large gap, firstCachedIndex should equal new index", 100,
-                buffer.getFirstCachedIndex());
+        assertEquals(100, buffer.getFirstCachedIndex(),
+                "When all entries are evicted by large gap, firstCachedIndex should equal new index");
 
         // The stored value should be correct
         assertEquals(Integer.valueOf(2000), buffer.get(100));
@@ -643,22 +818,22 @@ public class CachedBufferTest {
         Integer val99 = buffer.get(99);
 
         // All these should be null - they were never stored
-        assertNull("Index 96 was never stored, must be null", val96);
-        assertNull("Index 97 was never stored, must be null", val97);
-        assertNull("Index 98 was never stored, must be null", val98);
-        assertNull("Index 99 was never stored, must be null", val99);
+        assertNull(val96, "Index 96 was never stored, must be null");
+        assertNull(val97, "Index 97 was never stored, must be null");
+        assertNull(val98, "Index 98 was never stored, must be null");
+        assertNull(val99, "Index 99 was never stored, must be null");
 
         // Also verify that old indices are properly evicted
-        assertNull("Index 0 should be evicted", buffer.get(0));
-        assertNull("Index 1 should be evicted", buffer.get(1));
-        assertNull("Index 2 should be evicted", buffer.get(2));
+        assertNull(buffer.get(0), "Index 0 should be evicted");
+        assertNull(buffer.get(1), "Index 1 should be evicted");
+        assertNull(buffer.get(2), "Index 2 should be evicted");
     }
 
     @Test
     public void testLargeGapForwardEvictionPreservesInvariant() {
         // Additional test: verify the invariant
         // highestResultIndex - firstCachedIndex + 1 <= capacity
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(10);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(10);
 
         // Cache 5 values
         for (int i = 0; i < 5; i++) {
@@ -676,7 +851,7 @@ public class CachedBufferTest {
         int rangeSize = highest - first + 1;
 
         // The invariant must hold: rangeSize <= capacity (10)
-        assertTrue("Range size (" + rangeSize + ") must be <= capacity (10)", rangeSize <= 10);
+        assertTrue(rangeSize <= 10, "Range size (" + rangeSize + ") must be <= capacity (10)");
 
         // The new value should be retrievable
         assertEquals(Integer.valueOf(9999), buffer.get(1000));
@@ -688,7 +863,7 @@ public class CachedBufferTest {
         // This verifies that using localBuffer.length (not capacity) for slot
         // calculation
         // is correct, since it matches the buffer we're actually reading from.
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(Integer.MAX_VALUE); // Unbounded
+        CachedBuffer<Integer> buffer = CachedBuffer.of(Integer.MAX_VALUE); // Unbounded
         int readers = 4;
         int writers = 2;
         int iterations = 2000;
@@ -745,10 +920,10 @@ public class CachedBufferTest {
 
         ready.await();
         start.countDown();
-        assertTrue("Buffer growth read test did not complete in time", done.await(60, TimeUnit.SECONDS));
+        assertTrue(done.await(60, TimeUnit.SECONDS), "Buffer growth read test did not complete in time");
         executor.shutdownNow();
 
-        assertEquals("No incorrect reads should occur during buffer growth", 0, incorrectReads.get());
+        assertEquals(0, incorrectReads.get(), "No incorrect reads should occur during buffer growth");
     }
 
     @Test
@@ -756,7 +931,7 @@ public class CachedBufferTest {
         // Test that optimistic reads never return wrong values under write contention.
         // Lower iteration count is sufficient to validate correctness without long
         // runtime.
-        CachedBuffer<Integer> buffer = new CachedBuffer<>(1000);
+        CachedBuffer<Integer> buffer = CachedBuffer.of(1000);
         int readers = 4;
         int writers = 2;
         int iterations = 1000;
@@ -816,9 +991,9 @@ public class CachedBufferTest {
 
         ready.await();
         start.countDown();
-        assertTrue("Optimistic read test did not complete in time", done.await(60, TimeUnit.SECONDS));
+        assertTrue(done.await(60, TimeUnit.SECONDS), "Optimistic read test did not complete in time");
         executor.shutdownNow();
 
-        assertEquals("No incorrect reads should occur under contention", 0, incorrectReads.get());
+        assertEquals(0, incorrectReads.get(), "No incorrect reads should occur under contention");
     }
 }

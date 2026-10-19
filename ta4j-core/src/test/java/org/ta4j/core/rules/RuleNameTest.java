@@ -3,10 +3,10 @@
  */
 package org.ta4j.core.rules;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Rule;
 import org.ta4j.core.TradingRecord;
 import java.util.concurrent.CountDownLatch;
@@ -145,20 +145,23 @@ public class RuleNameTest {
         }
         start.countDown();
         boolean finished = done.await(10, TimeUnit.SECONDS);
-        assertTrue("Threads did not finish in time", finished);
+        assertTrue(finished, "Threads did not finish in time");
         assertEquals("CountingRule", rule.getName());
-        assertEquals("Default name should be built once per call under contention plus final read", threads + 1,
-                rule.getCreateDefaultNameCalls());
+        assertEquals(threads + 1, rule.getCreateDefaultNameCalls(),
+                "Default name should be built once per call under contention plus final read");
     }
 
     @Test
     public void customNameVisibleAcrossThreadsWithoutExplicitSync() throws Exception {
         CountingRule rule = new CountingRule();
         String customName = "CustomName-" + System.nanoTime();
+        CountDownLatch readerStarted = new CountDownLatch(1);
         CountDownLatch readerDone = new CountDownLatch(1);
         AtomicInteger seenCustom = new AtomicInteger(0);
 
         Thread reader = new Thread(() -> {
+            // Signal that polling has started before the writer publishes the name.
+            readerStarted.countDown();
             long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
             while (System.nanoTime() < deadline) {
                 if (customName.equals(rule.getName())) {
@@ -171,13 +174,15 @@ public class RuleNameTest {
         }, "custom-name-reader");
 
         reader.start();
-        // Writer thread sets the custom name after a short delay to avoid any implicit
-        // happens-before with reader start.
+        // The latch only orders the start of polling against the write; the writer's
+        // setName() and the reader's subsequent getName() calls are not synchronized,
+        // so the assertion still exercises a genuine cross-thread visibility publish.
         Thread writer = new Thread(() -> {
             try {
-                Thread.sleep(25);
+                readerStarted.await();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
+                return;
             }
             rule.setName(customName);
         }, "custom-name-writer");
@@ -186,7 +191,7 @@ public class RuleNameTest {
         writer.join(1000);
         readerDone.await(3, TimeUnit.SECONDS);
 
-        assertTrue("Custom name should become visible to reader thread", seenCustom.get() > 0);
+        assertTrue(seenCustom.get() > 0, "Custom name should become visible to reader thread");
         assertEquals(customName, rule.getName());
     }
 

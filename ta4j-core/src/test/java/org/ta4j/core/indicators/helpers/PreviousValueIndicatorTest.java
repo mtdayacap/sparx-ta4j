@@ -3,18 +3,19 @@
  */
 package org.ta4j.core.indicators.helpers;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.util.Random;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.indicators.averages.EMAIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.NaN;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class PreviousValueIndicatorTest {
 
@@ -29,7 +30,7 @@ public class PreviousValueIndicatorTest {
 
     private BarSeries series;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         var r = new Random();
         var now = Instant.now();
@@ -56,6 +57,16 @@ public class PreviousValueIndicatorTest {
         this.volumeIndicator = new VolumeIndicator(this.series);
         ClosePriceIndicator closePriceIndicator = new ClosePriceIndicator(this.series);
         this.emaIndicator = new EMAIndicator(closePriceIndicator, 20);
+    }
+
+    @Test
+    public void returnsNaNBeforeBeginIndexAfterRemoval() {
+        BarSeries removed = new MockBarSeriesBuilder().withData(1, 2, 3, 4).withMaxBarCount(3).build();
+        PreviousValueIndicator prev = new PreviousValueIndicator(new ClosePriceIndicator(removed));
+
+        // remaining closes are [2, 3, 4] at indices 1..3
+        assertTrue(prev.getValue(1).isNaN());
+        assertEquals(removed.getBar(1).getClosePrice(), prev.getValue(2));
     }
 
     @Test
@@ -132,8 +143,10 @@ public class PreviousValueIndicatorTest {
         assertTrue(prevValueIndicatorAsString.endsWith("]"));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testPreviousValueIndicatorWithNonPositiveN() {
-        prevValueIndicator = new PreviousValueIndicator(openPriceIndicator, 0);
+        assertThrows(IllegalArgumentException.class, () -> {
+            prevValueIndicator = new PreviousValueIndicator(openPriceIndicator, 0);
+        });
     }
 }

@@ -3,10 +3,15 @@
  */
 package org.ta4j.core.indicators;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
@@ -22,7 +27,7 @@ public class RAVIIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
 
         data = new MockBarSeriesBuilder().withNumFactory(numFactory)
@@ -52,4 +57,13 @@ public class RAVIIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, Num
         assertNumEquals(2.6167, ravi.getValue(13));
         assertNumEquals(4.0799, ravi.getValue(14));
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+
+        return List.of(serializationFixture(series, new RAVIIndicator(close, 3, 7), stableIndexes(series)));
+    }
+
 }

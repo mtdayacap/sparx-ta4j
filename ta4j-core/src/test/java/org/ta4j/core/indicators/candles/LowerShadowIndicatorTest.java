@@ -3,10 +3,11 @@
  */
 package org.ta4j.core.indicators.candles;
 
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -22,7 +23,7 @@ public class LowerShadowIndicatorTest extends AbstractIndicatorTest<Indicator<Nu
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
         series.barBuilder().openPrice(10).closePrice(18).highPrice(20).lowPrice(10).add();
@@ -40,5 +41,13 @@ public class LowerShadowIndicatorTest extends AbstractIndicatorTest<Indicator<Nu
         assertNumEquals(1, lowerShadow.getValue(2));
         assertNumEquals(3, lowerShadow.getValue(3));
         assertNumEquals(1, lowerShadow.getValue(4));
+    }
+
+    @Test
+    public void isNeverNegative() {
+        LowerShadowIndicator lowerShadow = new LowerShadowIndicator(series);
+        for (int i = series.getBeginIndex(); i <= series.getEndIndex(); i++) {
+            assertFalse(lowerShadow.getValue(i).isNegative());
+        }
     }
 }

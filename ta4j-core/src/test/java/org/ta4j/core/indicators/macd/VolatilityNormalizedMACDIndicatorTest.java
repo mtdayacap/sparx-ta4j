@@ -4,7 +4,7 @@
 package org.ta4j.core.indicators.macd;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -12,8 +12,8 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiFunction;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BaseBarSeries;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseBarSeriesBuilder;
@@ -42,7 +42,7 @@ public class VolatilityNormalizedMACDIndicatorTest extends AbstractIndicatorTest
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         this.series = buildOscillatingSeries(120);
     }
@@ -58,6 +58,9 @@ public class VolatilityNormalizedMACDIndicatorTest extends AbstractIndicatorTest
                 () -> new VolatilityNormalizedMACDIndicator(closePrice, 12, 26, 0));
         assertThrows(IllegalArgumentException.class,
                 () -> new VolatilityNormalizedMACDIndicator(closePrice, 12, 26, 26, 9, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> new VolatilityNormalizedMACDIndicator(closePrice, 12, 26, 26, 9, null));
+        assertThrows(NullPointerException.class, () -> new VolatilityNormalizedMACDIndicator((Indicator<Num>) null));
     }
 
     @Test
@@ -122,9 +125,22 @@ public class VolatilityNormalizedMACDIndicatorTest extends AbstractIndicatorTest
         assertThat(indicator.getAtrBarCount()).isEqualTo(34);
         assertThat(indicator.getDefaultSignalBarCount()).isEqualTo(5);
         assertThat(indicator.getScaleFactor()).isEqualByComparingTo(numFactory.numOf(200));
-        assertThat(indicator.getFastEma().getBarCount()).isEqualTo(8);
-        assertThat(indicator.getSlowEma().getBarCount()).isEqualTo(21);
-        assertThat(indicator.getAtrIndicator().getBarCount()).isEqualTo(34);
+        EMAIndicator firstFastEma = indicator.getFastEma();
+        EMAIndicator secondFastEma = indicator.getFastEma();
+        EMAIndicator firstSlowEma = indicator.getSlowEma();
+        EMAIndicator secondSlowEma = indicator.getSlowEma();
+        ATRIndicator firstAtr = indicator.getAtrIndicator();
+        ATRIndicator secondAtr = indicator.getAtrIndicator();
+
+        assertThat(firstFastEma).isNotSameAs(secondFastEma);
+        assertThat(firstSlowEma).isNotSameAs(secondSlowEma);
+        assertThat(firstAtr).isNotSameAs(secondAtr);
+        assertThat(firstFastEma.getBarCount()).isEqualTo(8);
+        assertThat(firstSlowEma.getBarCount()).isEqualTo(21);
+        assertThat(firstFastEma.getValue(34)).isEqualByComparingTo(secondFastEma.getValue(34));
+        assertThat(firstSlowEma.getValue(34)).isEqualByComparingTo(secondSlowEma.getValue(34));
+        assertThat(firstAtr.getBarCount()).isEqualTo(34);
+        assertThat(firstAtr.getValue(34)).isEqualByComparingTo(secondAtr.getValue(34));
     }
 
     @Test

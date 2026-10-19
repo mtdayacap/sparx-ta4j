@@ -4,10 +4,10 @@
 package org.ta4j.core.indicators;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
@@ -45,6 +45,18 @@ public class UltimateOscillatorIndicatorTest extends AbstractIndicatorTest<BarSe
 
         assertThat(defaultIndicator.getCountOfUnstableBars()).isEqualTo(28);
         assertSameNumOrNaN(defaultIndicator.getValue(74), explicitIndicator.getValue(74));
+    }
+
+    @Test
+    public void registersRunningTotalDelegatesAndTheirInputs() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1, 2, 3).build();
+        UltimateOscillatorIndicator indicator = new UltimateOscillatorIndicator(series, 1, 2, 3);
+
+        assertThat(indicator.getDependencies()).hasSize(6);
+        for (Indicator<?> runningTotal : indicator.getDependencies()) {
+            assertThat(runningTotal.getDependencies()).hasSize(1);
+            assertThat(runningTotal.getDependencies().get(0).getDependencies()).isNotEmpty();
+        }
     }
 
     @Test

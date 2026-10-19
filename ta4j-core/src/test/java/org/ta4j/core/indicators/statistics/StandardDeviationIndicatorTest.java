@@ -3,10 +3,15 @@
  */
 package org.ta4j.core.indicators.statistics;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -22,7 +27,7 @@ public class StandardDeviationIndicatorTest extends AbstractIndicatorTest<Indica
         super(numFunction);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         data = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1, 2, 3, 4, 3, 4, 5, 4, 3, 0, 9).build();
     }
@@ -67,4 +72,14 @@ public class StandardDeviationIndicatorTest extends AbstractIndicatorTest<Indica
         assertNumEquals(Math.sqrt(4.66666666666667), sdv.getValue(9));
         assertNumEquals(Math.sqrt(14), sdv.getValue(10));
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+
+        return List.of(serializationFixture(series, new StandardDeviationIndicator(close, 8, SampleType.SAMPLE),
+                stableIndexes(series)));
+    }
+
 }

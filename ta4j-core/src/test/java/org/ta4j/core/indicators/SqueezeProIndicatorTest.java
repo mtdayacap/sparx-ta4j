@@ -3,8 +3,11 @@
  */
 package org.ta4j.core.indicators;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.ta4j.core.num.NaN.NaN;
 
 import java.io.BufferedReader;
@@ -18,7 +21,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
@@ -244,8 +247,8 @@ public class SqueezeProIndicatorTest extends AbstractIndicatorTest<Indicator<Num
             Num expected = reference.momentumValues().get(i);
             Num actual = indicator.getValue(i);
             assertThat(actual.minus(expected).abs().doubleValue()).isLessThan(1e-9);
-            assertEquals("Unexpected squeeze level at index " + i, reference.squeezeLevels().get(i),
-                    indicator.getSqueezeLevel(i));
+            assertEquals(reference.squeezeLevels().get(i), indicator.getSqueezeLevel(i),
+                    "Unexpected squeeze level at index " + i);
         }
     }
 
@@ -552,4 +555,12 @@ public class SqueezeProIndicatorTest extends AbstractIndicatorTest<Indicator<Num
 
         return new LoadedSeries(series, indexByDate);
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        return List.of(serializationFixture(series, new SqueezeProIndicator(series, 8, 2.0, 1.0, 1.5, 2.0),
+                stableIndexes(series)));
+    }
+
 }

@@ -3,10 +3,15 @@
  */
 package org.ta4j.core.indicators;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.helpers.MedianPriceIndicator;
@@ -21,14 +26,14 @@ public class AwesomeOscillatorIndicatorTest extends AbstractIndicatorTest<Indica
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         this.series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
-        series.barBuilder().openPrice(0).closePrice(0).highPrice(16).lowPrice(8).add();
-        series.barBuilder().openPrice(0).closePrice(0).highPrice(12).lowPrice(6).add();
-        series.barBuilder().openPrice(0).closePrice(0).highPrice(18).lowPrice(14).add();
-        series.barBuilder().openPrice(0).closePrice(0).highPrice(10).lowPrice(6).add();
-        series.barBuilder().openPrice(0).closePrice(0).highPrice(8).lowPrice(4).add();
+        series.barBuilder().openPrice(8).closePrice(16).highPrice(16).lowPrice(8).add();
+        series.barBuilder().openPrice(6).closePrice(12).highPrice(12).lowPrice(6).add();
+        series.barBuilder().openPrice(14).closePrice(18).highPrice(18).lowPrice(14).add();
+        series.barBuilder().openPrice(6).closePrice(10).highPrice(10).lowPrice(6).add();
+        series.barBuilder().openPrice(4).closePrice(8).highPrice(8).lowPrice(4).add();
     }
 
     @Test
@@ -62,6 +67,15 @@ public class AwesomeOscillatorIndicatorTest extends AbstractIndicatorTest<Indica
         assertNumEquals(0, awesome.getValue(2));
         assertNumEquals(0, awesome.getValue(3));
         assertNumEquals(0, awesome.getValue(4));
+    }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        MedianPriceIndicator median = new MedianPriceIndicator(series);
+
+        return List
+                .of(serializationFixture(series, new AwesomeOscillatorIndicator(median, 2, 5), stableIndexes(series)));
     }
 
 }

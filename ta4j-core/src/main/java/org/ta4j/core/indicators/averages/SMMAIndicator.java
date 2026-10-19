@@ -4,7 +4,8 @@
 package org.ta4j.core.indicators.averages;
 
 import org.ta4j.core.Indicator;
-import org.ta4j.core.indicators.CachedIndicator;
+import org.ta4j.core.indicators.RecursiveCachedIndicator;
+import org.ta4j.core.num.NaN;
 import org.ta4j.core.num.Num;
 
 /**
@@ -18,7 +19,7 @@ import org.ta4j.core.num.Num;
  * some smoothing.
  *
  */
-public class SMMAIndicator extends CachedIndicator<Num> {
+public class SMMAIndicator extends RecursiveCachedIndicator<Num> {
 
     private final int barCount;
     private final Indicator<Num> indicator;
@@ -30,19 +31,41 @@ public class SMMAIndicator extends CachedIndicator<Num> {
      * @param barCount  the Simple Moving Average time frame
      */
     public SMMAIndicator(Indicator<Num> indicator, int barCount) {
-        super(indicator.getBarSeries());
+        super(indicator);
+
         this.barCount = barCount;
         this.indicator = indicator;
     }
 
     @Override
     protected Num calculate(int index) {
-
-        if (index == 0) {
-            // The first SMMA value is the first data point
-            return indicator.getValue(0);
+        while (true) {
+            final int beginIndex = getBarSeries().getBeginIndex();
+            if (beginIndex < 0) {
+                // Empty series: there is no bar to seed from or recurse to.
+                return NaN.NaN;
+            }
+            if (index < beginIndex) {
+                // A removed index mapped here by CachedIndicator: serve the first
+                // available bar's value (the retained recursion, or its seed).
+                // calculate(beginIndex) reads no predecessor, so this cannot recurse.
+                return getValue(beginIndex);
+            }
+            // Seed at the first retained bar: for a full series this is the first
+            // data point. On a bounded series retained values survive head
+            // advances, so this seed is only reached when no cached predecessor
+            // exists (for example a fresh indicator).
+            Num value = index == beginIndex ? indicator.getValue(index) : continueChain(index);
+            if (getBarSeries().getBeginIndex() == beginIndex) {
+                return value;
+            }
+            // The head advanced while this value was computed, so its predecessor
+            // or source may have been read from bars that are now removed. Retry
+            // against the new head.
         }
+    }
 
+    private Num continueChain(int index) {
         // Previous SMMA value
         Num previousSMMA = getValue(index - 1);
 
@@ -66,4 +89,5 @@ public class SMMAIndicator extends CachedIndicator<Num> {
     public String toString() {
         return getClass().getSimpleName() + " barCount: " + barCount;
     }
+
 }

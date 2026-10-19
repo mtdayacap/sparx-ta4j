@@ -3,8 +3,8 @@
  */
 package org.ta4j.core.indicators.helpers;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -16,7 +16,8 @@ import org.ta4j.core.num.NumFactory;
 import java.util.Arrays;
 import java.util.Collections;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 import static org.ta4j.core.num.NaN.NaN;
 
@@ -32,7 +33,7 @@ public class AverageIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, 
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         BarSeries barSeries = new MockBarSeriesBuilder().withNumFactory(numFactory).withDefaultData().build();
         one = new ConstantIndicator<>(barSeries, numFactory.numOf(1.0));
@@ -86,18 +87,29 @@ public class AverageIndicatorTest extends AbstractIndicatorTest<Indicator<Num>, 
         assertEquals(sma.getCountOfUnstableBars(), averageIndicator.getCountOfUnstableBars());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void indicatorShouldFailOnNull() {
-        new AverageIndicator();
+        assertThrows(IllegalArgumentException.class, AverageIndicator::new);
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void indicatorShouldFailOnEmptyList() {
-        new AverageIndicator(Collections.emptyList());
+        assertThrows(IllegalArgumentException.class, () -> new AverageIndicator(Collections.emptyList()));
     }
 
-    @Test(expected = NullPointerException.class)
+    @Test
     public void indicatorShouldFailOnListContainsNull() {
-        new AverageIndicator(Arrays.asList(one, null));
+        assertThrows(IllegalArgumentException.class, () -> new AverageIndicator(Arrays.asList(one, null)));
+    }
+
+    @Test
+    public void indicatorShouldFailOnNullVarargsArray() {
+        assertThrows(IllegalArgumentException.class, () -> new AverageIndicator((Indicator<Num>[]) null));
+    }
+
+    @Test
+    public void indicatorShouldFailOnDifferentSeries() {
+        BarSeries other = new MockBarSeriesBuilder().withNumFactory(numFactory).withData(1, 2, 3).build();
+        assertThrows(IllegalArgumentException.class, () -> new AverageIndicator(one, new ClosePriceIndicator(other)));
     }
 }

@@ -3,10 +3,15 @@
  */
 package org.ta4j.core.indicators;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
@@ -21,7 +26,7 @@ public class ChandelierExitShortIndicatorTest extends AbstractIndicatorTest<Indi
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         data = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
         data.barBuilder().openPrice(44.98).closePrice(45.05).highPrice(45.17).lowPrice(44.96).add();
@@ -67,4 +72,12 @@ public class ChandelierExitShortIndicatorTest extends AbstractIndicatorTest<Indi
         assertThat(Double.isNaN(ces.getValue(13).doubleValue())).isFalse();
         assertThat(Double.isNaN(ces.getValue(14).doubleValue())).isFalse();
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        return List.of(
+                serializationFixture(series, new ChandelierExitShortIndicator(series, 8, 2.5), stableIndexes(series)));
+    }
+
 }

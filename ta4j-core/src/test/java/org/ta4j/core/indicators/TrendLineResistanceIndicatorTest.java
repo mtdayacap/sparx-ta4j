@@ -11,7 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.helpers.ConstantIndicator;
@@ -125,7 +125,7 @@ public class TrendLineResistanceIndicatorTest extends AbstractIndicatorTest<Indi
         assertThat(descriptor.getComponents()).hasSize(1);
         final ComponentDescriptor swingDescriptor = descriptor.getComponents().getFirst();
         assertThat(swingDescriptor.getType()).isEqualTo("RecentFractalSwingHighIndicator");
-        assertThat(swingDescriptor.getParameters()).containsKey("unstableBars");
+        assertThat(swingDescriptor.getParameters()).doesNotContainKey("unstableBars");
         assertThat(swingDescriptor.getComponents())
                 .anySatisfy(component -> assertThat(component.getType()).isEqualTo("HighPriceIndicator"));
 

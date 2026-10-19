@@ -3,11 +3,18 @@
  */
 package org.ta4j.core.indicators.keltner;
 
-import static org.junit.Assert.assertEquals;
-import static org.ta4j.core.TestUtils.assertNumEquals;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
 
-import org.junit.Before;
-import org.junit.Test;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.ta4j.core.TestUtils.assertNumEquals;
+import static org.ta4j.core.indicators.IndicatorUtils.isSameSeries;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -25,7 +32,7 @@ public class KeltnerChannelFacadeTest extends AbstractIndicatorTest<Indicator<Nu
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         data = new MockBarSeriesBuilder().build();
         data.barBuilder().openPrice(11577.43).closePrice(11670.75).highPrice(11711.47).lowPrice(11577.35).add();
@@ -66,7 +73,7 @@ public class KeltnerChannelFacadeTest extends AbstractIndicatorTest<Indicator<Nu
     @Test
     public void testCreation() {
         final var facade = new KeltnerChannelFacade(data, 14, 14, 2);
-        assertEquals(data, facade.middle().getBarSeries());
+        assertTrue(isSameSeries(data, facade.middle().getBarSeries()));
     }
 
     @Test
@@ -86,4 +93,18 @@ public class KeltnerChannelFacadeTest extends AbstractIndicatorTest<Indicator<Nu
             assertNumEquals(km.getValue(i), middleNumeric.getValue(i));
         }
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+
+        return List.of(
+                serializationFixture(series, new KeltnerChannelFacade(series, 7, 5, 1.5).middle(),
+                        stableIndexes(series)),
+                serializationFixture(series, new KeltnerChannelFacade(series, 7, 5, 1.5).upper(),
+                        stableIndexes(series)),
+                serializationFixture(series, new KeltnerChannelFacade(series, 7, 5, 1.5).lower(),
+                        stableIndexes(series)));
+    }
+
 }

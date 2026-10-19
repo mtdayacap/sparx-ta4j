@@ -3,8 +3,8 @@
  */
 package org.ta4j.core.rules;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Trade;
@@ -23,14 +23,15 @@ import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 public class AverageTrueRangeStopLossRuleTest {
 
     private BarSeries series;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         series = new MockBarSeriesBuilder().withName("AverageTrueRangeStopLossRuleTest").build();
     }
@@ -107,7 +108,7 @@ public class AverageTrueRangeStopLossRuleTest {
         // Price below stop loss
         series.barBuilder()
                 .endTime(series.getLastBar().getEndTime().plus(Duration.ofDays(1)))
-                .openPrice(110)
+                .openPrice(113)
                 .highPrice(123)
                 .lowPrice(113)
                 .closePrice(123)
@@ -120,7 +121,7 @@ public class AverageTrueRangeStopLossRuleTest {
         // Price rises above stop loss
         series.barBuilder()
                 .endTime(series.getLastBar().getEndTime().plus(Duration.ofDays(1)))
-                .openPrice(110)
+                .openPrice(117)
                 .highPrice(127)
                 .lowPrice(117)
                 .closePrice(127)
@@ -296,5 +297,15 @@ public class AverageTrueRangeStopLossRuleTest {
                 new AverageTrueRangeStopLossRule(series, new ClosePriceIndicator(series), atrBarCount, atrCoefficient),
                 new AverageTrueRangeStopLossRule(new ClosePriceIndicator(series), new ATRIndicator(series, atrBarCount),
                         atrCoefficient));
+    }
+
+    @Test
+    public void constructorValidation() {
+        ClosePriceIndicator referencePrice = new ClosePriceIndicator(series);
+
+        assertThrows(IllegalArgumentException.class,
+                () -> new AverageTrueRangeStopLossRule(series, referencePrice, 4, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> new AverageTrueRangeStopLossRule(series, referencePrice, 4, -1.0));
     }
 }

@@ -3,10 +3,11 @@
  */
 package org.ta4j.core.indicators.ichimoku;
 
+import static org.junit.jupiter.api.Assertions.assertNotSame;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -23,7 +24,7 @@ public class IchimokuIndicatorTest extends AbstractIndicatorTest<Indicator<Num>,
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         data = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
         data.barBuilder().openPrice(44.98).closePrice(45.05).highPrice(45.17).lowPrice(44.96).add();
@@ -117,5 +118,23 @@ public class IchimokuIndicatorTest extends AbstractIndicatorTest<Indicator<Num>,
         assertNumEquals(NaN.NaN, chikouSpan.getValue(17));
         assertNumEquals(NaN.NaN, chikouSpan.getValue(18));
         assertNumEquals(NaN.NaN, chikouSpan.getValue(19));
+    }
+
+    @Test
+    public void lineCopiesPreserveSenkouSpanValues() {
+        IchimokuTenkanSenIndicator tenkanSen = new IchimokuTenkanSenIndicator(data, 3);
+        IchimokuKijunSenIndicator kijunSen = new IchimokuKijunSenIndicator(data, 5);
+        IchimokuTenkanSenIndicator tenkanCopy = tenkanSen.copy();
+        IchimokuKijunSenIndicator kijunCopy = kijunSen.copy();
+
+        assertNotSame(tenkanSen, tenkanCopy);
+        assertNotSame(kijunSen, kijunCopy);
+        assertNumEquals(tenkanSen.getValue(16), tenkanCopy.getValue(16));
+        assertNumEquals(kijunSen.getValue(16), kijunCopy.getValue(16));
+
+        IchimokuSenkouSpanAIndicator original = new IchimokuSenkouSpanAIndicator(data, tenkanSen, kijunSen, 5);
+        IchimokuSenkouSpanAIndicator copied = new IchimokuSenkouSpanAIndicator(data, tenkanCopy, kijunCopy, 5);
+
+        assertNumEquals(original.getValue(16), copied.getValue(16));
     }
 }

@@ -3,11 +3,17 @@
  */
 package org.ta4j.core.indicators.donchian;
 
-import static org.junit.Assert.assertEquals;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotSame;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
@@ -22,7 +28,7 @@ public class DonchianChannelMiddleIndicatorTest extends AbstractIndicatorTest<Ba
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         this.series = new MockBarSeriesBuilder().withName("DonchianChannelMiddleIndicatorTestSeries")
                 .withNumFactory(numFactory)
@@ -39,7 +45,7 @@ public class DonchianChannelMiddleIndicatorTest extends AbstractIndicatorTest<Ba
         series.barBuilder().openPrice(100).highPrice(105).lowPrice(95).closePrice(100).add();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
     }
 
@@ -58,4 +64,29 @@ public class DonchianChannelMiddleIndicatorTest extends AbstractIndicatorTest<Ba
         assertEquals(numOf(105), subject.getValue(8));
 
     }
+
+    @Test
+    public void constructorCopiesProvidedChannelBounds() {
+        DonchianChannelLowerIndicator lower = new DonchianChannelLowerIndicator(series, 3);
+        DonchianChannelUpperIndicator upper = new DonchianChannelUpperIndicator(series, 3);
+
+        DonchianChannelLowerIndicator lowerCopy = lower.copy();
+        DonchianChannelUpperIndicator upperCopy = upper.copy();
+        DonchianChannelMiddleIndicator subject = new DonchianChannelMiddleIndicator(series, 3, lower, upper);
+        DonchianChannelMiddleIndicator expected = new DonchianChannelMiddleIndicator(series, 3);
+
+        assertNotSame(lower, lowerCopy);
+        assertNotSame(upper, upperCopy);
+        assertEquals(lower.getValue(8), lowerCopy.getValue(8));
+        assertEquals(upper.getValue(8), upperCopy.getValue(8));
+        assertEquals(expected.getValue(8), subject.getValue(8));
+    }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        return List
+                .of(serializationFixture(series, new DonchianChannelMiddleIndicator(series, 9), stableIndexes(series)));
+    }
+
 }

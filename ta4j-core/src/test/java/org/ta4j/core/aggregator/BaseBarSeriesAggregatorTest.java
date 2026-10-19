@@ -3,15 +3,15 @@
  */
 package org.ta4j.core.aggregator;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertSame;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Bar;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -37,8 +37,8 @@ public class BaseBarSeriesAggregatorTest extends AbstractIndicatorTest<BarSeries
                 .endTime(time)
                 .openPrice(1d)
                 .closePrice(2d)
-                .highPrice(3d)
-                .lowPrice(4d)
+                .highPrice(4d)
+                .lowPrice(1d)
                 .volume(5d)
                 .amount(6d)
                 .trades(7)
@@ -47,8 +47,8 @@ public class BaseBarSeriesAggregatorTest extends AbstractIndicatorTest<BarSeries
                 .endTime(time.plus(Duration.ofDays(1)))
                 .openPrice(2d)
                 .closePrice(3d)
-                .highPrice(3d)
-                .lowPrice(4d)
+                .highPrice(4d)
+                .lowPrice(2d)
                 .volume(5d)
                 .amount(6d)
                 .trades(7)
@@ -57,8 +57,8 @@ public class BaseBarSeriesAggregatorTest extends AbstractIndicatorTest<BarSeries
                 .endTime(time.plus(Duration.ofDays(2)))
                 .openPrice(3d)
                 .closePrice(4d)
-                .highPrice(4d)
-                .lowPrice(5d)
+                .highPrice(5d)
+                .lowPrice(3d)
                 .volume(6d)
                 .amount(7d)
                 .trades(7)
@@ -84,8 +84,8 @@ public class BaseBarSeriesAggregatorTest extends AbstractIndicatorTest<BarSeries
                 .endTime(time)
                 .openPrice(1d)
                 .closePrice(2d)
-                .highPrice(3d)
-                .lowPrice(4d)
+                .highPrice(4d)
+                .lowPrice(1d)
                 .volume(5d)
                 .amount(6d)
                 .trades(7)
@@ -94,8 +94,8 @@ public class BaseBarSeriesAggregatorTest extends AbstractIndicatorTest<BarSeries
                 .endTime(time.plus(Duration.ofDays(1)))
                 .openPrice(2d)
                 .closePrice(3d)
-                .highPrice(3d)
-                .lowPrice(4d)
+                .highPrice(4d)
+                .lowPrice(2d)
                 .volume(5d)
                 .amount(6d)
                 .trades(7)
@@ -104,8 +104,8 @@ public class BaseBarSeriesAggregatorTest extends AbstractIndicatorTest<BarSeries
                 .endTime(time.plus(Duration.ofDays(2)))
                 .openPrice(3d)
                 .closePrice(4d)
-                .highPrice(4d)
-                .lowPrice(5d)
+                .highPrice(5d)
+                .lowPrice(3d)
                 .volume(6d)
                 .amount(7d)
                 .trades(7)

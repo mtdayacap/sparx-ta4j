@@ -3,20 +3,20 @@
  */
 package org.ta4j.core;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 import static org.ta4j.core.num.NaN.NaN;
 
 import java.time.Instant;
 import java.util.List;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Trade.TradeType;
 import org.ta4j.core.analysis.cost.CostModel;
 import org.ta4j.core.analysis.cost.LinearBorrowingCostModel;
@@ -38,7 +38,7 @@ public class PositionTest {
     private Trade exitSameType;
     private Trade exitDifferentType;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         this.newPosition = new Position();
         this.uncoveredPosition = new Position(TradeType.SELL);
@@ -94,10 +94,10 @@ public class PositionTest {
         assertTrue(newPosition.isClosed());
     }
 
-    @Test(expected = IllegalStateException.class)
+    @Test
     public void whenExitIndexIsLessThanEntryIndexShouldThrowException() {
         newPosition.operate(3);
-        newPosition.operate(1);
+        assertThrows(IllegalStateException.class, () -> newPosition.operate(1));
     }
 
     @Test
@@ -161,14 +161,15 @@ public class PositionTest {
         assertThrows(IllegalArgumentException.class, () -> position.operate(entry));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void shouldThrowIllegalArgumentExceptionWhenOrderTypeIsNull() {
-        new Position(null);
+        assertThrows(IllegalArgumentException.class, () -> new Position((TradeType) null));
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void shouldThrowIllegalArgumentExceptionWhenOrdersHaveSameType() {
-        new Position(Trade.buyAt(0, NaN, NaN), Trade.buyAt(1, NaN, NaN));
+        assertThrows(IllegalArgumentException.class,
+                () -> new Position(Trade.buyAt(0, NaN, NaN), Trade.buyAt(1, NaN, NaN)));
     }
 
     @Test
@@ -346,14 +347,18 @@ public class PositionTest {
         assertNull(position.totalFees());
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testCostModelEntryInconsistent() {
-        new Position(enter, exitDifferentType, new ZeroCostModel(), holdingModel);
+        assertThrows(IllegalArgumentException.class, () -> {
+            new Position(enter, exitDifferentType, new ZeroCostModel(), holdingModel);
+        });
     }
 
-    @Test(expected = IllegalArgumentException.class)
+    @Test
     public void testCostModelExitInconsistent() {
-        new Position(enter, exitDifferentType, transactionModel, holdingModel);
+        assertThrows(IllegalArgumentException.class, () -> {
+            new Position(enter, exitDifferentType, transactionModel, holdingModel);
+        });
     }
 
     @Test

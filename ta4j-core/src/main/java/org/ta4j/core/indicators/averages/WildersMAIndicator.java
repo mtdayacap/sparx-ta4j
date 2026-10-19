@@ -4,8 +4,9 @@
 package org.ta4j.core.indicators.averages;
 
 import org.ta4j.core.Indicator;
-import org.ta4j.core.indicators.CachedIndicator;
+import org.ta4j.core.indicators.RecursiveCachedIndicator;
 import org.ta4j.core.indicators.helpers.RunningTotalIndicator;
+import org.ta4j.core.num.NaN;
 import org.ta4j.core.num.Num;
 import org.ta4j.core.num.NumFactory;
 
@@ -18,19 +19,30 @@ import org.ta4j.core.num.NumFactory;
  *
  * The WMA inherently "remembers" past values due to its recursive formula, but
  * the initialization WMA can significantly bias early values. This bias
- * diminishes over time as more data contributes to the calculation. See the
- * test cases for this indicator as it skips the initial data until the
- * calculation stabilizes.
+ * diminishes over time as more data contributes to the calculation. On a
+ * bounded series, retained values survive head advances and, once the window
+ * holds more than {@code barCount} bars, each appended bar continues the cached
+ * recursion. Initialization is counted from where the recursion was seeded:
+ * only when no cached predecessor exists (for example a fresh indicator) does
+ * it restart at the retained head, using its first retained value as the
+ * missing-history proxy. See the test cases for this indicator as it skips the
+ * initial data until the calculation stabilizes.
  *
  * @see <a href=
  *      "https://www.tradingview.com/script/wXtQeoOg/#:~:text=Wilder%20did%20not%20use%20the,where%20K%20%3D1%2FN.">
  *      https://www.tradingview.com/script/wXtQeoOg/#:~:text=Wilder%20did%20not%20use%20the,where%20K%20%3D1%2FN.</a>
  */
-public class WildersMAIndicator extends CachedIndicator<Num> {
+public class WildersMAIndicator extends RecursiveCachedIndicator<Num> {
 
     private final Indicator<Num> indicator;
     private final int barCount;
     private final transient RunningTotalIndicator sumPriceIndicator;
+    /**
+     * First index of the live recursion: the retained head at which it was last
+     * seeded because no cached predecessor existed. Initialization is counted from
+     * here, so a recursion continued across head advances is not re-initialized.
+     */
+    private volatile transient int chainStartIndex = getBarSeries().getBeginIndex();
 
     /**
      * Constructor.
@@ -47,37 +59,68 @@ public class WildersMAIndicator extends CachedIndicator<Num> {
 
     @Override
     protected Num calculate(int index) {
+        while (true) {
+            final int beginIndex = getBarSeries().getBeginIndex();
+            if (beginIndex < 0) {
+                // Empty series: there is no bar to seed from or recurse to.
+                return NaN.NaN;
+            }
+            if (index < beginIndex) {
+                // A removed index mapped here by CachedIndicator: serve the first
+                // available bar's value (the retained recursion, or its seed)
+                // without re-seeding the live chain. calculate(beginIndex) reads no
+                // predecessor.
+                return getValue(beginIndex);
+            }
+            Num value;
+            if (index == beginIndex) {
+                // Seed at the first retained bar. On a bounded series retained
+                // values survive head advances, so this is only reached when no
+                // cached predecessor exists (for example a fresh indicator).
+                chainStartIndex = beginIndex;
+                value = indicator.getValue(index);
+            } else {
+                value = continueChain(index, beginIndex);
+            }
+            if (getBarSeries().getBeginIndex() == beginIndex) {
+                return value;
+            }
+            // The head advanced while this value was computed, so its predecessor,
+            // source or initialization band may have been read from bars that are
+            // now removed. Retry against the new head.
+        }
+    }
+
+    private Num continueChain(int index, int beginIndex) {
         NumFactory numFactory = getBarSeries().numFactory();
         Num one = numFactory.one();
 
         Num numBars = numFactory.numOf(barCount);
         Num k = one.dividedBy(numBars);
-        Num prevWMA = indicator.getValue(0);
 
-        // Simulate extended historical data for initialization
-        if (index < barCount) {
-            // Pretend there are extra `barCount` points before the first real point
-            // Use the first actual value as a proxy for the "missing" earlier data
-            Num simulatedValue = indicator.getValue(0);
+        // Resolve the predecessor first: when it is not cached the recursion walks
+        // back to the retained head and re-seeds there, updating the chain start.
+        Num previousWildersAverage = getValue(index - 1);
+        final int chainStart = chainStartIndex;
+        final long chainIndex = (long) index - chainStart;
+        if (chainIndex < barCount && chainStart >= beginIndex) {
+            // Simulate extended historical data for initialization, counted from
+            // where the chain was seeded. Use the seed value as a proxy for the
+            // "missing" earlier data.
+            Num simulatedValue = indicator.getValue(chainStart);
 
             // Initialize with a simulated Simple Moving Average (SMA)
             Num sum = sumPriceIndicator.getValue(index);
 
             // Return average of available points for initialization
-            Num preResult = sum.plus(simulatedValue.multipliedBy(numFactory.numOf(barCount - index - 1)))
-                    .dividedBy(numBars);
-
-            prevWMA = preResult;
-            return preResult;
+            Num simulatedSum = sum.plus(simulatedValue.multipliedBy(numFactory.numOf(barCount - chainIndex - 1)));
+            return simulatedSum.dividedBy(numBars);
         }
 
-        // For the first value, initialize with the first input value
-
-        if (index > 0) {
-            prevWMA = getValue(index - 1);
-        }
+        // Past initialization, or an initialization band whose seed bars have left
+        // the window: continue the recursion from the cached predecessor.
         Num currentPrice = indicator.getValue(index);
-        return currentPrice.multipliedBy(k).plus(prevWMA.multipliedBy(numFactory.one().minus(k)));
+        return currentPrice.multipliedBy(k).plus(previousWildersAverage.multipliedBy(one.minus(k)));
     }
 
     @Override
@@ -89,4 +132,5 @@ public class WildersMAIndicator extends CachedIndicator<Num> {
     public String toString() {
         return getClass().getSimpleName() + " barCount: " + barCount;
     }
+
 }

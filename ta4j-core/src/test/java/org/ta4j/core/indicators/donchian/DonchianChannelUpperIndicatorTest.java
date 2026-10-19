@@ -3,11 +3,16 @@
  */
 package org.ta4j.core.indicators.donchian;
 
-import static org.junit.Assert.assertEquals;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
 
-import org.junit.After;
-import org.junit.Before;
-import org.junit.Test;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+import org.junit.jupiter.api.AfterEach;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
@@ -22,7 +27,7 @@ public class DonchianChannelUpperIndicatorTest extends AbstractIndicatorTest<Bar
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
         this.series = new MockBarSeriesBuilder().withNumFactory(numFactory)
                 .withName("DonchianChannelUpperIndicatorTestSeries")
@@ -39,7 +44,7 @@ public class DonchianChannelUpperIndicatorTest extends AbstractIndicatorTest<Bar
         series.barBuilder().openPrice(100).highPrice(105).lowPrice(95).closePrice(100).add();
     }
 
-    @After
+    @AfterEach
     public void tearDown() {
     }
 
@@ -72,4 +77,12 @@ public class DonchianChannelUpperIndicatorTest extends AbstractIndicatorTest<Bar
         assertEquals(numOf(110), subject.getValue(7));
         assertEquals(numOf(105), subject.getValue(8));
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        return List
+                .of(serializationFixture(series, new DonchianChannelUpperIndicator(series, 8), stableIndexes(series)));
+    }
+
 }

@@ -3,8 +3,7 @@
  */
 package org.ta4j.core.indicators;
 
-import java.util.Arrays;
-import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 import org.ta4j.core.Bar;
@@ -50,13 +49,12 @@ import org.ta4j.core.num.Num;
  */
 public class DistanceFromMAIndicator extends CachedIndicator<Num> {
 
-    private static final Set<Class<?>> supportedMovingAverages = new HashSet<>(
-            Arrays.asList(EMAIndicator.class, DoubleEMAIndicator.class, TripleEMAIndicator.class, SMAIndicator.class,
-                    WMAIndicator.class, ZLEMAIndicator.class, HMAIndicator.class, KAMAIndicator.class,
-                    LWMAIndicator.class, AbstractEMAIndicator.class, MMAIndicator.class, WildersMAIndicator.class,
-                    DMAIndicator.class, EDMAIndicator.class, JMAIndicator.class, TMAIndicator.class,
-                    ATMAIndicator.class, MCGinleyMAIndicator.class, SMMAIndicator.class, SGMAIndicator.class,
-                    LSMAIndicator.class, KiJunV2Indicator.class, VIDYAIndicator.class, VWMAIndicator.class));
+    private static final Set<Class<?>> supportedMovingAverages = Set.of(EMAIndicator.class, DoubleEMAIndicator.class,
+            TripleEMAIndicator.class, SMAIndicator.class, WMAIndicator.class, ZLEMAIndicator.class, HMAIndicator.class,
+            KAMAIndicator.class, LWMAIndicator.class, AbstractEMAIndicator.class, MMAIndicator.class,
+            WildersMAIndicator.class, DMAIndicator.class, EDMAIndicator.class, JMAIndicator.class, TMAIndicator.class,
+            ATMAIndicator.class, MCGinleyMAIndicator.class, SMMAIndicator.class, SGMAIndicator.class,
+            LSMAIndicator.class, KiJunV2Indicator.class, VIDYAIndicator.class, VWMAIndicator.class);
 
     private final Indicator<Num> movingAverage;
 
@@ -67,12 +65,22 @@ public class DistanceFromMAIndicator extends CachedIndicator<Num> {
      * @param movingAverage the moving average
      */
     public DistanceFromMAIndicator(BarSeries series, Indicator<Num> movingAverage) {
-        super(series);
-        if (!(supportedMovingAverages.contains(movingAverage.getClass()))) {
+        this(validatedConfig(series, movingAverage));
+    }
+
+    private DistanceFromMAIndicator(Config config) {
+        super(config.series(), config.movingAverage());
+        this.movingAverage = config.movingAverage();
+    }
+
+    private static Config validatedConfig(BarSeries series, Indicator<Num> movingAverage) {
+        BarSeries validatedSeries = Objects.requireNonNull(series, "series");
+        Indicator<Num> validatedMovingAverage = Objects.requireNonNull(movingAverage, "movingAverage");
+        if (!(supportedMovingAverages.contains(validatedMovingAverage.getClass()))) {
             throw new IllegalArgumentException(
-                    "Passed indicator must be a moving average based indicator. " + movingAverage.toString());
+                    "Passed indicator must be a moving average based indicator. " + validatedMovingAverage);
         }
-        this.movingAverage = movingAverage;
+        return new Config(validatedSeries, validatedMovingAverage);
     }
 
     @Override
@@ -86,5 +94,8 @@ public class DistanceFromMAIndicator extends CachedIndicator<Num> {
     @Override
     public int getCountOfUnstableBars() {
         return movingAverage.getCountOfUnstableBars();
+    }
+
+    private record Config(BarSeries series, Indicator<Num> movingAverage) {
     }
 }

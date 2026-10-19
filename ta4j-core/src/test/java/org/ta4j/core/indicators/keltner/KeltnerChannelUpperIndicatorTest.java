@@ -3,12 +3,21 @@
  */
 package org.ta4j.core.indicators.keltner;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.ta4j.core.TestUtils.assertNumEquals;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.Indicator;
+import org.ta4j.core.indicators.ATRIndicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
+import org.ta4j.core.indicators.StochasticIndicator;
 import org.ta4j.core.indicators.helpers.ClosePriceIndicator;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
@@ -22,7 +31,7 @@ public class KeltnerChannelUpperIndicatorTest extends AbstractIndicatorTest<Indi
         super(numFactory);
     }
 
-    @Before
+    @BeforeEach
     public void setUp() {
 
         data = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
@@ -110,4 +119,84 @@ public class KeltnerChannelUpperIndicatorTest extends AbstractIndicatorTest<Indi
             assertThat(restored.getValue(i)).isEqualTo(indicator.getValue(i));
         }
     }
+
+    @Test
+    public void headAdvanceRebuildsUpperChannelOverRebaseliningMiddle() {
+        // The middle channel over a rebaselining source re-anchors its EMA at
+        // the new first valid index after a head advance; the cached upper
+        // channel must follow instead of serving the stale pre-advance EMA
+        // chain.
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        series.barBuilder().openPrice(0).closePrice(0).highPrice(0).lowPrice(0).add();
+        series.barBuilder().openPrice(50).closePrice(50).highPrice(50).lowPrice(0).add();
+        series.barBuilder().openPrice(0).closePrice(0).highPrice(0).lowPrice(0).add();
+        series.barBuilder().openPrice(50).closePrice(50).highPrice(50).lowPrice(0).add();
+        series.barBuilder().openPrice(0).closePrice(0).highPrice(0).lowPrice(0).add();
+        series.barBuilder().openPrice(50).closePrice(50).highPrice(50).lowPrice(0).add();
+        series.barBuilder().openPrice(0).closePrice(0).highPrice(0).lowPrice(0).add();
+        series.barBuilder().openPrice(50).closePrice(50).highPrice(50).lowPrice(0).add();
+        series.barBuilder().openPrice(0).closePrice(0).highPrice(0).lowPrice(0).add();
+        series.barBuilder().openPrice(50).closePrice(50).highPrice(50).lowPrice(0).add();
+        series.barBuilder().openPrice(0).closePrice(0).highPrice(0).lowPrice(0).add();
+        series.barBuilder().openPrice(50).closePrice(50).highPrice(50).lowPrice(0).add();
+        StochasticIndicator stochastic = new StochasticIndicator(new ClosePriceIndicator(series), 3);
+        KeltnerChannelMiddleIndicator middle = new KeltnerChannelMiddleIndicator(stochastic, 2);
+        KeltnerChannelUpperIndicator upper = new KeltnerChannelUpperIndicator(middle, 1d, 2);
+        upper.getValue(11);
+
+        series.setMaximumBarCount(8);
+        assertEquals(4, series.getBeginIndex());
+
+        KeltnerChannelMiddleIndicator freshMiddle = new KeltnerChannelMiddleIndicator(stochastic, 2);
+        KeltnerChannelUpperIndicator freshUpper = new KeltnerChannelUpperIndicator(freshMiddle, 1d, 2);
+        for (int i = 4; i <= 11; i++) {
+            assertNumEquals(freshUpper.getValue(i), upper.getValue(i));
+        }
+    }
+
+    @Test
+    public void headAdvanceKeepsUpperChannelOverRetainedAverageTrueRange() {
+        // The average true range keeps its full-history chain across a head
+        // advance (#1666), so the cached upper channel must keep matching an
+        // unbounded series; only a fresh channel re-seeds at the retained head.
+        BarSeries series = steppedSeries();
+        BarSeries unbounded = steppedSeries();
+        KeltnerChannelUpperIndicator upper = upperChannel(series);
+        upper.getValue(5);
+
+        series.setMaximumBarCount(3);
+        assertEquals(3, series.getBeginIndex());
+
+        KeltnerChannelUpperIndicator reference = upperChannel(unbounded);
+        for (int i = 3; i <= 5; i++) {
+            assertNumEquals(reference.getValue(i), upper.getValue(i));
+        }
+
+        assertNumEquals(60, upperChannel(series).getValue(5));
+    }
+
+    private static KeltnerChannelUpperIndicator upperChannel(BarSeries series) {
+        KeltnerChannelMiddleIndicator middle = new KeltnerChannelMiddleIndicator(new ClosePriceIndicator(series), 1);
+        return new KeltnerChannelUpperIndicator(middle, 1d, 2);
+    }
+
+    private BarSeries steppedSeries() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        for (int i = 0; i <= 5; i++) {
+            int price = i * 10;
+            series.barBuilder().openPrice(price).closePrice(price).highPrice(price).lowPrice(price - 3).add();
+        }
+        return series;
+    }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        ClosePriceIndicator close = new ClosePriceIndicator(series);
+
+        return List.of(serializationFixture(series,
+                new KeltnerChannelUpperIndicator(new KeltnerChannelMiddleIndicator(close, 7), 1.5, 6),
+                stableIndexes(series)));
+    }
+
 }

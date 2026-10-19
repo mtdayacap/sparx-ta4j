@@ -20,6 +20,11 @@ on:
         required: false
         default: "7"
         type: string
+      dryRun:
+        description: "Run release health in dry-run mode (audit only; no discussion mutation)."
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -38,9 +43,33 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Normalize dry run input
+        id: dry_run
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
+            raw="${{ github.event.inputs.dryRun }}"
+            if [ -z "$raw" ]; then
+              raw=true
+            fi
+            normalized=$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')
+
+            if [ "$normalized" = "false" ] || [ "$normalized" = "0" ] || [ "$normalized" = "no" ]; then
+              dry_run=false
+            else
+              dry_run=true
+            fi
+          else
+            raw=""
+            dry_run=false
+          fi
+
+          echo "audit:dry_run_input_raw='${raw}'"
+          echo "audit:dry_run_normalized=$dry_run"
+          echo "dryRun=$dry_run" >> $GITHUB_OUTPUT
 
       - name: Fetch tags
         run: git fetch --tags
@@ -162,8 +191,9 @@ jobs:
           POM_VERSION: ${{ steps.state.outputs.pom_version }}
         run: |
           set -euo pipefail
-          python3 scripts/release/release_helpers.py snapshot-publication \
+          bash scripts/release/release_helpers.sh snapshot-publication \
             --version "${POM_VERSION}" \
+            --require-artifacts \
             --output snapshot-publication.json \
             --github-output "$GITHUB_OUTPUT"
 
@@ -174,7 +204,7 @@ jobs:
           HEALTH_TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
         run: |
           set -euo pipefail
-          python3 scripts/release/release_helpers.py snapshot-publication-policy \
+          bash scripts/release/release_helpers.sh snapshot-publication-policy \
             --event-name "${HEALTH_EVENT_NAME}" \
             --workflow-name "${HEALTH_TRIGGER_WORKFLOW}" \
             --output snapshot-publication-policy.json \
@@ -182,7 +212,7 @@ jobs:
 
       - name: Check for stale release PRs
         id: stale_prs
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           INPUT_STALE_DAYS: ${{ github.event.inputs.staleDays }}
           VAR_STALE_DAYS: ${{ vars.RELEASE_PR_STALE_DAYS }}
@@ -242,6 +272,10 @@ jobs:
           SNAPSHOT_PUBLICATION_LATEST: ${{ steps.snapshot_publication.outputs.snapshot_publication_latest }}
           SNAPSHOT_PUBLICATION_LAST_UPDATED: ${{ steps.snapshot_publication.outputs.snapshot_publication_last_updated }}
           SNAPSHOT_PUBLICATION_SOURCE: ${{ steps.snapshot_publication.outputs.snapshot_publication_source }}
+          SNAPSHOT_PUBLICATION_RESOLVED_VERSION: ${{ steps.snapshot_publication.outputs.snapshot_publication_resolved_version }}
+          SNAPSHOT_PUBLICATION_ARTIFACT_METADATA_SOURCE: ${{ steps.snapshot_publication.outputs.snapshot_publication_artifact_metadata_source }}
+          SNAPSHOT_PUBLICATION_POM_URL: ${{ steps.snapshot_publication.outputs.snapshot_publication_pom_url }}
+          SNAPSHOT_PUBLICATION_JAR_URL: ${{ steps.snapshot_publication.outputs.snapshot_publication_jar_url }}
           SNAPSHOT_PUBLICATION_ENFORCED: ${{ steps.snapshot_policy.outputs.snapshot_publication_enforced }}
           SNAPSHOT_PUBLICATION_PENDING_REASON: ${{ steps.snapshot_policy.outputs.snapshot_publication_pending_reason }}
           NOTES_PRESENT: ${{ steps.state.outputs.release_notes_present }}
@@ -251,6 +285,7 @@ jobs:
           RELEASE_NOTIFY_USER: ${{ vars.RELEASE_NOTIFY_USER }}
           HEALTH_EVENT_NAME: ${{ github.event_name }}
           HEALTH_TRIGGER_WORKFLOW: ${{ github.event.workflow_run.name }}
+          DRY_RUN: ${{ steps.dry_run.outputs.dryRun }}
         run: |
           set -euo pipefail
 
@@ -293,6 +328,18 @@ jobs:
           if [ -z "${SNAPSHOT_PUBLICATION_SOURCE:-}" ]; then
             SNAPSHOT_PUBLICATION_SOURCE="(unknown)"
           fi
+          if [ -z "${SNAPSHOT_PUBLICATION_RESOLVED_VERSION:-}" ]; then
+            SNAPSHOT_PUBLICATION_RESOLVED_VERSION="(unknown)"
+          fi
+          if [ -z "${SNAPSHOT_PUBLICATION_ARTIFACT_METADATA_SOURCE:-}" ]; then
+            SNAPSHOT_PUBLICATION_ARTIFACT_METADATA_SOURCE="(unknown)"
+          fi
+          if [ -z "${SNAPSHOT_PUBLICATION_POM_URL:-}" ]; then
+            SNAPSHOT_PUBLICATION_POM_URL="(unknown)"
+          fi
+          if [ -z "${SNAPSHOT_PUBLICATION_JAR_URL:-}" ]; then
+            SNAPSHOT_PUBLICATION_JAR_URL="(unknown)"
+          fi
           if [ -z "${SNAPSHOT_PUBLICATION_ENFORCED:-}" ]; then
             SNAPSHOT_PUBLICATION_ENFORCED="false"
           fi
@@ -317,6 +364,9 @@ jobs:
           if [ -z "${HEALTH_TRIGGER_WORKFLOW:-}" ]; then
             HEALTH_TRIGGER_WORKFLOW="(none)"
           fi
+          if [ -z "${DRY_RUN:-}" ]; then
+            DRY_RUN="false"
+          fi
 
           effective_snapshot_publication="${SNAPSHOT_PUBLICATION}"
           snapshot_publication_note="(none)"
@@ -340,7 +390,7 @@ jobs:
 
           if [ "$effective_snapshot_publication" = "false" ]; then
             drift=true
-            reasons+=("current snapshot version not published to Maven snapshot repository")
+            reasons+=("current snapshot version POM/JAR not consumable from Maven snapshot repository")
           fi
 
           if [ "$effective_snapshot_publication" = "unknown" ]; then
@@ -373,9 +423,18 @@ jobs:
           run_url="https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
           timestamp=$(date '+%-I:%M:%S %p on %-m.%-d.%Y')
           notify_user="${RELEASE_NOTIFY_USER:-TheCookieLab}"
+          if [ "$DRY_RUN" = "true" ]; then
+            marker_run="dry-run"
+            mutation_plan="would post the release-health summary to the Release Scheduler discussion"
+            rerun_guidance="rerun release-health.yml with dryRun=false, or let schedule/push/workflow-run triggers publish the health post"
+          else
+            marker_run="real"
+            mutation_plan="posts the latest release-health summary to the Release Scheduler discussion"
+            rerun_guidance="not needed for this non-dry-run health publication"
+          fi
 
           cat > notification-body.txt <<EOF
-          <!-- ta4j:post-type=release-health;run=real -->
+          <!-- ta4j:post-type=release-health;run=${marker_run} -->
           @${notify_user}
 
           **Release Health Check ${status} at ${timestamp}**
@@ -384,6 +443,7 @@ jobs:
           - Default branch: ${DEFAULT_BRANCH}
           - Event: ${HEALTH_EVENT_NAME}
           - Upstream workflow: ${HEALTH_TRIGGER_WORKFLOW}
+          - Dry run: ${DRY_RUN}
 
           Tag Health:
           - latest tag: ${LATEST_TAG}
@@ -400,8 +460,12 @@ jobs:
           - snapshot publication enforced: ${SNAPSHOT_PUBLICATION_ENFORCED}
           - snapshot published: ${effective_snapshot_publication}
           - snapshot publication note: ${snapshot_publication_note}
-          - snapshot metadata latest: ${SNAPSHOT_PUBLICATION_LATEST}
+          - resolved snapshot version: ${SNAPSHOT_PUBLICATION_RESOLVED_VERSION}
+          - snapshot metadata latest (informational): ${SNAPSHOT_PUBLICATION_LATEST}
           - snapshot metadata last updated: ${SNAPSHOT_PUBLICATION_LAST_UPDATED}
+          - artifact metadata: ${SNAPSHOT_PUBLICATION_ARTIFACT_METADATA_SOURCE}
+          - exact POM: ${SNAPSHOT_PUBLICATION_POM_URL}
+          - exact JAR: ${SNAPSHOT_PUBLICATION_JAR_URL}
 
           Stale Release PRs (>${STALE_DAYS} days):
           - count: ${STALE_COUNT}
@@ -409,6 +473,10 @@ jobs:
 
           Drift reasons:
           ${reason_text}
+
+          Dry-Run / Mutation Plan:
+          - mutation plan: ${mutation_plan}
+          - rerun guidance: ${rerun_guidance}
           EOF
 
           echo "drift_found=$drift" >> $GITHUB_OUTPUT
@@ -416,6 +484,7 @@ jobs:
           {
             "status": "${status}",
             "drift": "${drift}",
+            "dryRun": "${DRY_RUN}",
             "defaultBranch": "${DEFAULT_BRANCH}",
             "latestTag": "${LATEST_TAG}",
             "lastReachableTag": "${LAST_REACHABLE_TAG}",
@@ -431,8 +500,14 @@ jobs:
             "snapshotMetadataLatest": "${SNAPSHOT_PUBLICATION_LATEST}",
             "snapshotMetadataLastUpdated": "${SNAPSHOT_PUBLICATION_LAST_UPDATED}",
             "snapshotMetadataSource": "${SNAPSHOT_PUBLICATION_SOURCE}",
+            "snapshotResolvedVersion": "${SNAPSHOT_PUBLICATION_RESOLVED_VERSION}",
+            "snapshotArtifactMetadataSource": "${SNAPSHOT_PUBLICATION_ARTIFACT_METADATA_SOURCE}",
+            "snapshotPomUrl": "${SNAPSHOT_PUBLICATION_POM_URL}",
+            "snapshotJarUrl": "${SNAPSHOT_PUBLICATION_JAR_URL}",
             "releaseNotesPresent": "${NOTES_PRESENT}",
             "staleReleasePrCount": "${STALE_COUNT}",
+            "mutationPlan": "${mutation_plan}",
+            "rerunGuidance": "${rerun_guidance}",
             "runUrl": "${run_url}"
           }
           EOF
@@ -441,6 +516,7 @@ jobs:
             echo ""
             echo "- status: ${status}"
             echo "- drift: ${drift}"
+            echo "- dry run: ${DRY_RUN}"
             echo "- latest tag: ${LATEST_TAG}"
             echo "- last reachable tag: ${LAST_REACHABLE_TAG}"
             echo "- latest tag reachable: ${LATEST_TAG_REACHABLE}"
@@ -448,12 +524,15 @@ jobs:
             echo "- snapshot ahead of latest tag: ${SNAPSHOT_OK}"
             echo "- snapshot publication enforced: ${SNAPSHOT_PUBLICATION_ENFORCED}"
             echo "- snapshot published: ${effective_snapshot_publication}"
+            echo "- resolved snapshot version: ${SNAPSHOT_PUBLICATION_RESOLVED_VERSION}"
             echo "- stale release PR count: ${STALE_COUNT}"
+            echo "- mutation plan: ${mutation_plan}"
+            echo "- rerun guidance: ${rerun_guidance}"
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Upload release health audit artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: release-health-audit-${{ github.run_id }}
           path: |
@@ -466,8 +545,8 @@ jobs:
           retention-days: 14
 
       - name: Post to Release Scheduler discussion
-        if: always()
-        uses: actions/github-script@v8
+        if: always() && steps.dry_run.outputs.dryRun != 'true'
+        uses: actions/github-script@v9
         env:
           RELEASE_SCHEDULER_DISCUSSION_NUMBER: ${{ vars.RELEASE_SCHEDULER_DISCUSSION_NUMBER }}
           RELEASE_NOTIFY_USER: ${{ vars.RELEASE_NOTIFY_USER }}

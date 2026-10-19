@@ -3,8 +3,8 @@
  */
 package org.ta4j.core.analysis;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
@@ -13,7 +13,7 @@ import java.math.MathContext;
 import java.time.Duration;
 import java.time.Instant;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.AnalysisCriterion;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseBarSeriesBuilder;
@@ -277,6 +277,36 @@ public class AnalysisWindowTest {
     }
 
     @Test
+    public void marksPositionExitingAfterWindowEndOnlyWhenConfigured() {
+        BarSeries series = buildSeries(10);
+        TradingRecord record = new BaseTradingRecord(Trade.buyAt(2, series), Trade.sellAt(8, series));
+        NetProfitLossCriterion criterion = new NetProfitLossCriterion();
+        AnalysisWindow window = AnalysisWindow.barRange(2, 5);
+        AnalysisContext context = AnalysisContext.defaults()
+                .withOpenPositionHandling(OpenPositionHandling.MARK_TO_MARKET);
+
+        Num ignored = criterion.calculate(series, record, window);
+        Num marked = criterion.calculate(series, record, window, context);
+
+        assertNumEquals(0, ignored);
+        assertNumEquals(3, marked);
+    }
+
+    @Test
+    public void marksFutureExitAlongsideLaterOpenPosition() {
+        BarSeries series = buildSeries(10);
+        TradingRecord record = new BaseTradingRecord(Trade.buyAt(2, series), Trade.sellAt(8, series),
+                Trade.buyAt(9, series));
+        NetProfitLossCriterion criterion = new NetProfitLossCriterion();
+        AnalysisContext context = AnalysisContext.defaults()
+                .withOpenPositionHandling(OpenPositionHandling.MARK_TO_MARKET);
+
+        Num marked = criterion.calculate(series, record, AnalysisWindow.barRange(2, 5), context);
+
+        assertNumEquals(3, marked);
+    }
+
+    @Test
     public void fullyContainedPolicyExcludesMarkToMarketWhenEntryIsBeforeWindow() {
         BarSeries series = buildSeries(10);
         TradingRecord record = new BaseTradingRecord(Trade.buyAt(2, series));
@@ -294,9 +324,9 @@ public class AnalysisWindowTest {
         BarSeries series = buildSeries(10);
         BaseTradingRecord record = new BaseTradingRecord(TradeType.BUY, ExecutionMatchPolicy.FIFO, new ZeroCostModel(),
                 new ZeroCostModel(), null, null);
-        record.recordFill(6, new BaseTrade(6, series.getBar(6).getEndTime(), series.getBar(6).getClosePrice(),
+        record.operate(new BaseTrade(6, series.getBar(6).getEndTime(), series.getBar(6).getClosePrice(),
                 series.numFactory().one(), null, ExecutionSide.BUY, null, null));
-        record.recordFill(7, new BaseTrade(7, series.getBar(7).getEndTime(), series.getBar(7).getClosePrice(),
+        record.operate(new BaseTrade(7, series.getBar(7).getEndTime(), series.getBar(7).getClosePrice(),
                 series.numFactory().one(), null, ExecutionSide.BUY, null, null));
         NetProfitLossCriterion criterion = new NetProfitLossCriterion();
         AnalysisContext context = AnalysisContext.defaults()

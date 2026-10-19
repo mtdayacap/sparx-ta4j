@@ -3,7 +3,7 @@
     <parent>
         <groupId>org.ta4j</groupId>
         <artifactId>ta4j-parent</artifactId>
-        <version>0.22.7-SNAPSHOT</version>
+        <version>0.26.1-SNAPSHOT</version>
     </parent>
     <artifactId>ta4j-examples</artifactId>
 
@@ -12,6 +12,9 @@
 
     <properties>
         <exec.mainClass>ta4jexamples.Quickstart</exec.mainClass>
+        <!-- Coverage ratchet: current floors; raise as coverage improves, never lower. -->
+        <ta4j.jacoco.line.minimum>0.51</ta4j.jacoco.line.minimum>
+        <ta4j.jacoco.branch.minimum>0.44</ta4j.jacoco.branch.minimum>
     </properties>
 
     <dependencies>
@@ -20,11 +23,6 @@
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
-            <scope>test</scope>
-        </dependency>
-        <dependency>
-            <groupId>org.junit.vintage</groupId>
-            <artifactId>junit-vintage-engine</artifactId>
             <scope>test</scope>
         </dependency>
         <dependency>
@@ -85,7 +83,7 @@
 
     <build>
         <plugins>
-            <!-- Override parent: header/config live in parent dir (avoids CWD dependency when building from workspace root) -->
+            <!-- Override parent: header lives in parent dir (avoids CWD dependency when building from workspace root) -->
             <plugin>
                 <groupId>com.mycila</groupId>
                 <artifactId>license-maven-plugin</artifactId>
@@ -98,13 +96,6 @@
                             </includes>
                         </licenseSet>
                     </licenseSets>
-                </configuration>
-            </plugin>
-            <plugin>
-                <groupId>net.revelc.code.formatter</groupId>
-                <artifactId>formatter-maven-plugin</artifactId>
-                <configuration>
-                    <configFile>${project.parent.basedir}/code-formatter.xml</configFile>
                 </configuration>
             </plugin>
             <plugin>
@@ -130,6 +121,7 @@
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>exec-maven-plugin</artifactId>
                 <configuration>
+                    <skip>false</skip>
                     <mainClass>${exec.mainClass}</mainClass>
                 </configuration>
             </plugin>

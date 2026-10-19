@@ -3,12 +3,16 @@
  */
 package org.ta4j.core.indicators.supertrend;
 
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.serializationSeries;
+import static org.ta4j.core.indicators.IndicatorSerializationRoundTripTestSupport.stableIndexes;
+
+import java.util.List;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.ta4j.core.TestUtils.assertNumEquals;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
-import org.ta4j.core.Indicator;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
 import org.ta4j.core.num.Num;
@@ -289,13 +293,19 @@ public class SuperTrendIndicatorTest extends AbstractIndicatorTest<BarSeries, Nu
 
         SuperTrendLowerBandIndicator lowerBand = indicator.getSuperTrendLowerBandIndicator();
         SuperTrendUpperBandIndicator upperBand = indicator.getSuperTrendUpperBandIndicator();
+        SuperTrendLowerBandIndicator secondLowerBand = indicator.getSuperTrendLowerBandIndicator();
+        SuperTrendUpperBandIndicator secondUpperBand = indicator.getSuperTrendUpperBandIndicator();
 
         assertThat(lowerBand).isNotNull();
         assertThat(upperBand).isNotNull();
+        assertThat(lowerBand).isNotSameAs(secondLowerBand);
+        assertThat(upperBand).isNotSameAs(secondUpperBand);
 
         // Verify they return valid values after unstable period
         assertThat(Num.isNaNOrNull(lowerBand.getValue(2))).isFalse();
         assertThat(Num.isNaNOrNull(upperBand.getValue(2))).isFalse();
+        assertThat(lowerBand.getValue(2)).isEqualByComparingTo(secondLowerBand.getValue(2));
+        assertThat(upperBand.getValue(2)).isEqualByComparingTo(secondUpperBand.getValue(2));
     }
 
     @Test
@@ -331,23 +341,32 @@ public class SuperTrendIndicatorTest extends AbstractIndicatorTest<BarSeries, Nu
     }
 
     @Test
-    public void serializationRoundTrip() {
-        BarSeries series = buildLongerSeries();
-        // Use default parameters to ensure round-trip reconstruction works
-        // since the framework reconstructs using the default constructor
-        SuperTrendIndicator original = new SuperTrendIndicator(series);
+    public void cachedValuesKeepFullHistoryChainAfterHeadAdvance() {
+        // The ATR and the recursive bands keep their full-history chains across
+        // a head advance (#1666): the first retained true range losing its
+        // previous close only re-evaluates a value the chain already consumed.
+        BarSeries series = steppedSeries();
+        BarSeries unbounded = steppedSeries();
+        SuperTrendIndicator cached = new SuperTrendIndicator(series, 2, 2d);
+        cached.getValue(series.getEndIndex());
 
-        String json = original.toJson();
-        @SuppressWarnings("unchecked")
-        Indicator<Num> restored = (Indicator<Num>) Indicator.fromJson(series, json);
+        series.setMaximumBarCount(3);
+        series.barBuilder().openPrice(45).closePrice(45).highPrice(46).lowPrice(42).add();
+        unbounded.barBuilder().openPrice(45).closePrice(45).highPrice(46).lowPrice(42).add();
 
-        assertThat(restored).isInstanceOf(SuperTrendIndicator.class);
-        assertThat(restored.toDescriptor()).isEqualTo(original.toDescriptor());
-
-        // Verify values match
+        SuperTrendIndicator reference = new SuperTrendIndicator(unbounded, 2, 2d);
         for (int i = series.getBeginIndex(); i <= series.getEndIndex(); i++) {
-            assertThat(restored.getValue(i)).isEqualTo(original.getValue(i));
+            assertNumEquals(reference.getValue(i), cached.getValue(i));
         }
+    }
+
+    private BarSeries steppedSeries() {
+        BarSeries series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        for (int i = 0; i <= 5; i++) {
+            int price = i * 10;
+            series.barBuilder().openPrice(price).closePrice(price).highPrice(price).lowPrice(price - 3).add();
+        }
+        return series;
     }
 
     private BarSeries buildSeries() {
@@ -415,4 +434,11 @@ public class SuperTrendIndicatorTest extends AbstractIndicatorTest<BarSeries, Nu
         series.barBuilder().openPrice(95).closePrice(90).highPrice(96).lowPrice(89).add();
         return series;
     }
+
+    @Override
+    protected List<IndicatorSerializationFixture<?>> serializationFixtures() {
+        BarSeries series = serializationSeries(numFactory);
+        return List.of(serializationFixture(series, new SuperTrendIndicator(series, 8, 2.0), stableIndexes(series)));
+    }
+
 }

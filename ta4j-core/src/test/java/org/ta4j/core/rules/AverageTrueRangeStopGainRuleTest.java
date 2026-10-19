@@ -3,14 +3,14 @@
  */
 package org.ta4j.core.rules;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.time.Duration;
 import java.time.Instant;
-import org.junit.Before;
-import org.junit.Test;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.BarSeries;
 import org.ta4j.core.BaseTradingRecord;
 import org.ta4j.core.Trade;
@@ -27,7 +27,7 @@ public class AverageTrueRangeStopGainRuleTest {
 
     private BarSeries series;
 
-    @Before
+    @BeforeEach
     public void setUp() {
         series = new MockBarSeriesBuilder().withName("Test Series").build();
 
@@ -191,5 +191,8 @@ public class AverageTrueRangeStopGainRuleTest {
         FixedIndicator<Num> reference = new FixedIndicator<>(series, constant, constant, constant, constant, constant);
         assertThrows(IllegalArgumentException.class, () -> new AverageTrueRangeStopGainRule(series, null, 4, 2.0));
         assertThrows(IllegalArgumentException.class, () -> new AverageTrueRangeStopGainRule(series, reference, 0, 2.0));
+        assertThrows(IllegalArgumentException.class, () -> new AverageTrueRangeStopGainRule(series, reference, 4, 0));
+        assertThrows(IllegalArgumentException.class,
+                () -> new AverageTrueRangeStopGainRule(series, reference, 4, -1.0));
     }
 }

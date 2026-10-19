@@ -3,15 +3,15 @@
  */
 package org.ta4j.core.rules;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
 import java.time.LocalTime;
 import java.util.List;
 
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Bar;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.indicators.helpers.DateTimeIndicator;
@@ -85,8 +85,8 @@ public class TimeRangeRuleTest extends AbstractIndicatorTest<Object, Object> {
 
         TimeRangeRule rule = new TimeRangeRule(dateTimeIndicator, from, to);
 
-        assertTrue("02:30 should be inside first range", rule.isSatisfied(0, null));
-        assertTrue("18:15 should be inside second range", rule.isSatisfied(1, null));
+        assertTrue(rule.isSatisfied(0, null), "02:30 should be inside first range");
+        assertTrue(rule.isSatisfied(1, null), "18:15 should be inside second range");
     }
 
     @Test
@@ -105,6 +105,25 @@ public class TimeRangeRuleTest extends AbstractIndicatorTest<Object, Object> {
         var dateTimeIndicator = new DateTimeIndicator(series, Bar::getBeginTime);
         int[] from = { -1 };
         int[] to = { LocalTime.of(1, 0).toSecondOfDay() };
+
+        assertThrows(IllegalArgumentException.class, () -> new TimeRangeRule(dateTimeIndicator, from, to));
+    }
+
+    @Test
+    public void constructorRejectsInvertedRanges() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        var dateTimeIndicator = new DateTimeIndicator(series, Bar::getBeginTime);
+        var inverted = new TimeRangeRule.TimeRange(LocalTime.of(22, 0), LocalTime.of(2, 0));
+
+        assertThrows(IllegalArgumentException.class, () -> new TimeRangeRule(List.of(inverted), dateTimeIndicator));
+    }
+
+    @Test
+    public void constructorWithSecondArraysRejectsInvertedRanges() {
+        final var series = new MockBarSeriesBuilder().withNumFactory(numFactory).build();
+        var dateTimeIndicator = new DateTimeIndicator(series, Bar::getBeginTime);
+        int[] from = { LocalTime.of(22, 0).toSecondOfDay() };
+        int[] to = { LocalTime.of(2, 0).toSecondOfDay() };
 
         assertThrows(IllegalArgumentException.class, () -> new TimeRangeRule(dateTimeIndicator, from, to));
     }

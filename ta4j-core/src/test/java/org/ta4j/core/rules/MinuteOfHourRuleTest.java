@@ -3,12 +3,12 @@
  */
 package org.ta4j.core.rules;
 
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.fail;
 
 import java.time.Instant;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.Bar;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
 import org.ta4j.core.indicators.helpers.DateTimeIndicator;
@@ -74,7 +74,7 @@ public class MinuteOfHourRuleTest extends AbstractIndicatorTest<Object, Object> 
         MinuteOfHourRule rule = new MinuteOfHourRule(dateTime, allMinutes);
 
         for (int i = 0; i < 60; i++) {
-            assertTrue("Minute " + i + " should be satisfied", rule.isSatisfied(i, null));
+            assertTrue(rule.isSatisfied(i, null), "Minute " + i + " should be satisfied");
         }
     }
 
@@ -135,14 +135,9 @@ public class MinuteOfHourRuleTest extends AbstractIndicatorTest<Object, Object> 
     /**
      * Tests serialization/deserialization round-trip for MinuteOfHourRule.
      * <p>
-     * <b>Note:</b> This test may be skipped if serialization is not yet supported
-     * for MinuteOfHourRule. The test uses {@code Assume.assumeNoException()} to
-     * gracefully skip when serialization fails, rather than failing the build. This
-     * is intentional - the test serves as a placeholder until serialization support
-     * is implemented.
-     * <p>
-     * When serialization support is added to MinuteOfHourRule, this test should
-     * pass automatically. See the TODO comment in MinuteOfHourRule class.
+     * Serializes the rule and its descriptor, reconstructs it, and verifies that
+     * the round-tripped rule is equivalent and behaves identically. Any
+     * serialization failure fails this test.
      */
     @Test
     public void serializeAndDeserialize() {

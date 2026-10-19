@@ -3,12 +3,12 @@
  */
 package org.ta4j.core;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertSame;
-import static org.junit.Assert.assertThrows;
-import static org.junit.Assert.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -16,9 +16,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.junit.Test;
-import org.junit.runner.RunWith;
-import org.junit.runners.Parameterized;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.bars.TimeBarBuilder;
 import org.ta4j.core.bars.TimeBarBuilderFactory;
 import org.ta4j.core.indicators.AbstractIndicatorTest;
@@ -33,7 +31,6 @@ import org.ta4j.core.num.NumFactory;
  *
  * @since 0.22.2
  */
-@RunWith(Parameterized.class)
 public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSeries, Num> {
 
     public ConcurrentBarSeriesBuilderTest(NumFactory numFactory) {
@@ -97,7 +94,9 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
     @Test
     public void testWithBars() {
         List<Bar> bars = createTestBars(3);
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(bars).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withName("testWithBarsSeries")
+                .withBars(bars)
+                .build();
 
         assertEquals(3, series.getBarCount());
         assertEquals(0, series.getBeginIndex());
@@ -106,8 +105,86 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
     }
 
     @Test
+    public void testWithBeginIndexPreservesAbsoluteIndexesThroughAppendAndPruning() {
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(createTestBars(3))
+                .withNumFactory(numFactory)
+                .withBeginIndex(100)
+                .withMaxBarCount(3)
+                .build();
+
+        assertEquals(100, series.getBeginIndex());
+        assertEquals(102, series.getEndIndex());
+        assertEquals(100, series.getRemovedBarsCount());
+        assertEquals(createTestBars(3).get(0), series.getBar(100));
+
+        series.addBar(createTestBar(3));
+
+        assertEquals(101, series.getBeginIndex());
+        assertEquals(103, series.getEndIndex());
+        assertEquals(101, series.getRemovedBarsCount());
+        assertEquals(createTestBar(3), series.getBar(103));
+    }
+
+    @Test
+    public void testWithBeginIndexClampsSubSeriesToRetainedWindow() {
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(createTestBars(3))
+                .withNumFactory(numFactory)
+                .withBeginIndex(50)
+                .build();
+
+        ConcurrentBarSeries subSeries = series.getSubSeries(0, 52);
+
+        assertEquals(50, subSeries.getBeginIndex());
+        assertEquals(51, subSeries.getEndIndex());
+        assertEquals(series.getBar(50), subSeries.getBar(50));
+    }
+
+    @Test
+    public void testWithBeginIndexSupportsIntegerMaximumWithoutWrapping() {
+        Bar first = createTestBar(0);
+        Bar second = createTestBar(1);
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(List.of(first))
+                .withNumFactory(numFactory)
+                .withBeginIndex(Integer.MAX_VALUE)
+                .build();
+
+        assertEquals(Integer.MAX_VALUE, series.getBeginIndex());
+        assertEquals(Integer.MAX_VALUE, series.getEndIndex());
+        assertThrows(ArithmeticException.class, () -> series.addBar(second));
+        assertEquals(1, series.getBarCount());
+        assertThrows(ArithmeticException.class,
+                () -> new ConcurrentBarSeriesBuilder().withBars(List.of(first, second))
+                        .withNumFactory(numFactory)
+                        .withBeginIndex(Integer.MAX_VALUE)
+                        .build());
+    }
+
+    @Test
+    public void testWithBeginIndexRejectsNegativeValues() {
+        assertThrows(IllegalArgumentException.class, () -> new ConcurrentBarSeriesBuilder().withBeginIndex(-1));
+    }
+
+    @Test
+    public void testClearRestoredSeriesResetsInitialIndex() {
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(createTestBars(1))
+                .withNumFactory(numFactory)
+                .withBeginIndex(40)
+                .withMaxBarCount(10)
+                .build();
+
+        series.clear();
+        series.addBar(createTestBar(1));
+
+        assertEquals(0, series.getBeginIndex());
+        assertEquals(0, series.getEndIndex());
+        assertEquals(10, series.getMaximumBarCount());
+    }
+
+    @Test
     public void testWithBarsEmptyList() {
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(Collections.emptyList()).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withName("testWithBarsEmptyListSeries")
+                .withBars(Collections.emptyList())
+                .build();
 
         assertEquals(0, series.getBarCount());
         assertEquals(-1, series.getBeginIndex());
@@ -119,7 +196,8 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
     public void testWithBarsCreatesCopy() {
         List<Bar> originalBars = createTestBars(3);
         List<Bar> barsCopy = new ArrayList<>(originalBars);
-        ConcurrentBarSeriesBuilder builder = new ConcurrentBarSeriesBuilder().withBars(barsCopy);
+        ConcurrentBarSeriesBuilder builder = new ConcurrentBarSeriesBuilder().withName("testWithBarsCreatesCopySeries")
+                .withBars(barsCopy);
 
         // Modify original list
         barsCopy.add(createTestBar(3));
@@ -142,7 +220,9 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
         NumFactory customFactory = numFactory instanceof DoubleNumFactory ? DecimalNumFactory.getInstance()
                 : DoubleNumFactory.getInstance();
 
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withNumFactory(customFactory).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withName("testWithNumFactorySeries")
+                .withNumFactory(customFactory)
+                .build();
 
         assertSame(customFactory, series.numFactory());
     }
@@ -160,7 +240,9 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
     public void testWithBarBuilderFactory() {
         BarBuilderFactory customFactory = new MockBarBuilderFactory();
 
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBarBuilderFactory(customFactory).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withName("testWithBarBuilderFactorySeries")
+                .withBarBuilderFactory(customFactory)
+                .build();
 
         assertSame(customFactory, series.barBuilderFactory());
     }
@@ -177,14 +259,19 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
 
     @Test
     public void testWithMaxBarCount() {
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withMaxBarCount(100).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withName("testWithMaxBarCountSeries")
+                .withMaxBarCount(100)
+                .build();
 
         assertEquals(100, series.getMaximumBarCount());
     }
 
     @Test
     public void testWithMaxBarCountAtMaxValueKeepsSeriesUnconstrained() {
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withMaxBarCount(Integer.MAX_VALUE).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder()
+                .withName("testWithMaxBarCountAtMaxValueKeepsSeriesUnconstrainedSeries")
+                .withMaxBarCount(Integer.MAX_VALUE)
+                .build();
 
         series.setMaximumBarCount(100);
         assertEquals(100, series.getMaximumBarCount());
@@ -193,14 +280,19 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
     @Test
     public void testWithMaxBarCountZero() {
         // Maximum bar count must be strictly positive
-        assertThrows(IllegalArgumentException.class, () -> new ConcurrentBarSeriesBuilder().withMaxBarCount(0).build());
+        assertThrows(IllegalArgumentException.class,
+                () -> new ConcurrentBarSeriesBuilder().withName("testWithMaxBarCountZeroSeries")
+                        .withMaxBarCount(0)
+                        .build());
     }
 
     @Test
     public void testWithMaxBarCountNegative() {
         // Maximum bar count must be strictly positive
         assertThrows(IllegalArgumentException.class,
-                () -> new ConcurrentBarSeriesBuilder().withMaxBarCount(-1).build());
+                () -> new ConcurrentBarSeriesBuilder().withName("testWithMaxBarCountNegativeSeries")
+                        .withMaxBarCount(-1)
+                        .build());
     }
 
     @Test
@@ -235,14 +327,19 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
 
     @Test
     public void testBuildWithoutMaxBarCountIsConstrained() {
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(createTestBars(1)).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder()
+                .withName("testBuildWithoutMaxBarCountIsConstrainedSeries")
+                .withBars(createTestBars(1))
+                .build();
 
         assertThrows(IllegalStateException.class, () -> series.setMaximumBarCount(50));
     }
 
     @Test
     public void testBuildWithMaxBarCountAllowsUpdates() {
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(createTestBars(1))
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder()
+                .withName("testBuildWithMaxBarCountAllowsUpdatesSeries")
+                .withBars(createTestBars(1))
                 .withMaxBarCount(50)
                 .build();
 
@@ -271,13 +368,15 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
     @Test
     public void testBuilderResetsBarsAfterBuild() {
         List<Bar> bars1 = createTestBars(3);
-        ConcurrentBarSeriesBuilder builder = new ConcurrentBarSeriesBuilder().withBars(bars1);
+        ConcurrentBarSeriesBuilder builder = new ConcurrentBarSeriesBuilder()
+                .withName("testBuilderResetsBarsAfterBuildSeries")
+                .withBars(bars1);
 
         ConcurrentBarSeries first = builder.build();
         assertEquals(3, first.getBarCount());
 
         // Builder should be reset, so second build should be empty
-        ConcurrentBarSeries second = builder.build();
+        ConcurrentBarSeries second = builder.withName("testBuilderResetsBarsAfterBuildSeries").build();
         assertEquals(0, second.getBarCount());
     }
 
@@ -354,7 +453,9 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
     @Test
     public void testBuildWithSingleBar() {
         List<Bar> singleBar = createTestBars(1);
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(singleBar).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withName("testBuildWithSingleBarSeries")
+                .withBars(singleBar)
+                .build();
 
         assertEquals(1, series.getBarCount());
         assertEquals(0, series.getBeginIndex());
@@ -364,7 +465,9 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
     @Test
     public void testBuildWithLargeBarCount() {
         List<Bar> manyBars = createTestBars(1000);
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(manyBars).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withName("testBuildWithLargeBarCountSeries")
+                .withBars(manyBars)
+                .build();
 
         assertEquals(1000, series.getBarCount());
         assertEquals(0, series.getBeginIndex());
@@ -374,7 +477,10 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
     @Test
     public void testBuildWithMaxBarCountApplied() {
         List<Bar> bars = createTestBars(10);
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withBars(bars).withMaxBarCount(5).build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withName("testBuildWithMaxBarCountAppliedSeries")
+                .withBars(bars)
+                .withMaxBarCount(5)
+                .build();
 
         // Max bar count is applied immediately, so only 5 bars should remain
         // When bars are removed, beginIndex is adjusted based on removedBarsCount
@@ -387,15 +493,19 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
 
     @Test
     public void testBuildReturnsConcurrentBarSeries() {
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder()
+                .withName("testBuildReturnsConcurrentBarSeriesSeries")
+                .build();
         assertTrue(series instanceof ConcurrentBarSeries);
     }
 
     // ==================== Null Parameter Handling Tests ====================
 
-    @Test(expected = NullPointerException.class)
+    @Test
     public void testWithBarsNull() {
-        new ConcurrentBarSeriesBuilder().withBars(null);
+        assertThrows(NullPointerException.class, () -> {
+            new ConcurrentBarSeriesBuilder().withBars(null);
+        });
     }
 
     @Test
@@ -450,7 +560,8 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
 
     @Test
     public void testDefaultBarBuilderFactory() {
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().withName("testDefaultBarBuilderFactorySeries")
+                .build();
         BarBuilderFactory factory = series.barBuilderFactory();
         assertNotNull(factory);
         assertTrue(factory instanceof TimeBarBuilderFactory);
@@ -458,7 +569,9 @@ public class ConcurrentBarSeriesBuilderTest extends AbstractIndicatorTest<BarSer
 
     @Test
     public void testDefaultBarBuilderFactoryCreatesRealtimeBars() {
-        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder().build();
+        ConcurrentBarSeries series = new ConcurrentBarSeriesBuilder()
+                .withName("testDefaultBarBuilderFactoryCreatesRealtimeBarsSeries")
+                .build();
         BarBuilderFactory factory = series.barBuilderFactory();
 
         // Default factory should create realtime bars (TimeBarBuilderFactory(true))
