@@ -5,7 +5,7 @@ package org.ta4j.core.criteria;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
 import org.ta4j.core.*;
 import org.ta4j.core.mocks.MockBarBuilder;
 import org.ta4j.core.mocks.MockBarSeriesBuilder;
@@ -18,7 +18,7 @@ import java.util.ArrayList;
 import java.util.List;
 import org.ta4j.core.num.NumFactory;
 
-import static org.junit.Assert.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class CompoundedAnnualGrowthReturnCriteriaTest extends AbstractCriterionTest {
     public CompoundedAnnualGrowthReturnCriteriaTest(NumFactory numFactory) {
